@@ -4,23 +4,26 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
+# Import mấy cái "hàng nhà làm" của mày vào đây
 import models.user
+import models.quiz
 import schemas
 import auth
-from database import engine, get_db
+from database import get_db, init_db
 from dependencies import get_current_user, require_role
 from models.user import UserRole
 
-# Create all tables (in development SQLite uses this, but in prod alembic is preferred)
-models.user.Base.metadata.create_all(bind=engine)
+# 1. Khởi tạo DB trước khi App chạy
+init_db()
 
+# 2. Khai báo App
 app = FastAPI(
     title="Online Exam System API",
-    description="Backend API for the Online Exam System",
+    description="Backend API cho con Azota Clone",
     version="1.0.0"
 )
 
-# Setup CORS for development
+# 3. Setup CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"], 
@@ -28,6 +31,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+def read_root():
+    return {"status": "success", "message": "Backend da thong nong!"}
+
+# ... Các route khác (register, login) giữ nguyên bên dưới ...
 
 @app.get("/")
 def read_root():

@@ -1,21 +1,27 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Database URL format: database_backend://user:password@host/database_name
-# Adjust based on whether you use SQLite, PostgreSQL, etc.
-DATABASE_URL = "sqlite:///./online_exam.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./azota_clone.db"
 
 engine = create_engine(
-    DATABASE_URL, 
-    connect_args={"check_same_thread": False} # Needed only for SQLite
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# ĐÂY LÀ DÒNG QUAN TRỌNG NHẤT
+Base = declarative_base()
+
+# Hàm lấy DB session
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+# Hàm khởi tạo bảng (Để import bên trong hàm để tránh vòng lặp)
+def init_db():
+    import models.user
+    import models.quiz
+    Base.metadata.create_all(bind=engine)

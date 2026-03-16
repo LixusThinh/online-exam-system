@@ -1,20 +1,23 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Enum
+from sqlalchemy.orm import relationship
 import enum
-from . import Base
+from database import Base
 
 class UserRole(str, enum.Enum):
-    ADMIN = "ADMIN"
-    TEACHER = "TEACHER"
-    STUDENT = "STUDENT"
+    ADMIN = "admin"
+    TEACHER = "teacher"
+    STUDENT = "student"
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(50), unique=True, index=True)
-    email = Column(String(100), unique=True, index=True)
-    full_name = Column(String(100), nullable=True)
-    hashed_password = Column(String(200), nullable=False)
-    role = Column(SQLEnum(UserRole), default=UserRole.STUDENT, nullable=False)
-    is_active = Column(Boolean, default=True)
-    is_admin = Column(Boolean, default=False)  # You can keep this or rely entirely on `role`. Let's keep for backward compatibility or remove later if not needed.
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String)
+    role = Column(Enum(UserRole), default=UserRole.STUDENT)
+
+    # Relationships
+    classes = relationship("Class", back_populates="teacher")
+    quizzes = relationship("Quiz", back_populates="teacher")
+    submissions = relationship("Submission", back_populates="student")
