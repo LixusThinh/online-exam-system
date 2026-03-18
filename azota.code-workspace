@@ -1,0 +1,9 @@
+{
+  "folders": [
+    { "path": "frontend" },
+    { "path": "backend" }
+  ],
+  "settings": {
+    "python.analysis.diagnosticMode": "workspace"
+  }
+}

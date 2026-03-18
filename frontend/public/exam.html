@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Làm Bài Thi</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, .08);
+        }
+
+        .question-card,
+        .sidebar-card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, .05);
+            background: #fff;
+            margin-bottom: 20px;
+        }
+
+        .question-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        /* Custom radio button styles for answers */
+        .answer-label {
+            width: 100%;
+            text-align: left;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            font-size: 1.05rem;
+            white-space: normal;
+        }
+
+        .btn-check:checked+.answer-label {
+            background-color: #e7f1ff;
+            border-color: #0d6efd;
+            color: #084298;
+            font-weight: 500;
+        }
+
+        .answer-label:hover {
+            background-color: #f8f9fa;
+            border-color: #b6d4fe;
+        }
+
+        /* Sidebar Styles */
+        #timer-display {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #dc3545;
+            text-align: center;
+            padding: 15px 0;
+            background: #fff3f3;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+
+        .question-nav-btn {
+            width: 42px;
+            height: 42px;
+            margin: 4px;
+            border-radius: 8px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+
+        .question-nav-btn.answered {
+            background-color: #198754;
+            color: white;
+            border-color: #198754;
+        }
+
+        .question-nav-btn.current {
+            background-color: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+
+        .question-nav-btn.unanswered {
+            background-color: #fff;
+            color: #495057;
+            border-color: #ced4da;
+        }
+
+        .question-nav-btn:hover {
+            opacity: 0.85;
+            color: inherit;
+        }
+
+        /* Loading Overlay */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            z-index: 9999;
+            display: none;
+            /* Hidden by default */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner-border {
+            width: 4rem;
+            height: 4rem;
+            border-width: 0.3rem;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+        <div class="container">
+            <a class="navbar-brand fw-bold mb-0 h1" href="#"><i class="bi bi-mortarboard-fill me-2"></i>EduExam</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    <li class="nav-item me-4">
+                        <span class="nav-link active text-white"><i class="bi bi-book me-1"></i> Môn thi: Lập trình Web
+                            Frontend</span>
+                    </li>
+                    <li class="nav-item">
+                        <div class="d-flex align-items-center text-white bg-white bg-opacity-25 px-3 py-1 rounded-pill">
+                            <i class="bi bi-person-circle me-2 fs-5"></i>
+                            <span class="fw-medium">Nguyễn Văn A (MSSV: 2024001)</span>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container my-4">
+        <div class="row flex-column-reverse flex-lg-row">
+
+            <!-- Questions Area -->
+            <div class="col-lg-8">
+
+                <!-- Question 1 -->
+                <div class="card question-card p-4" id="q1">
+                    <h5 class="question-title">Câu 1: Trong Bootstrap 5, class nào được sử dụng để biến một nhóm radio
+                        buttons thành dạng nút bấm (button-like)?</h5>
+                    <div class="answers">
+                        <input type="radio" class="btn-check" name="question1" id="q1a1" autocomplete="off"
+                            onchange="markAnswered('btn-q1')">
+                        <label class="btn answer-label" for="q1a1">A. .btn-radio</label>
+
+                        <input type="radio" class="btn-check" name="question1" id="q1a2" autocomplete="off"
+                            onchange="markAnswered('btn-q1')">
+                        <label class="btn answer-label" for="q1a2">B. .btn-check</label>
+
+                        <input type="radio" class="btn-check" name="question1" id="q1a3" autocomplete="off"
+                            onchange="markAnswered('btn-q1')">
+                        <label class="btn answer-label" for="q1a3">C. .radio-btn</label>
+
+                        <input type="radio" class="btn-check" name="question1" id="q1a4" autocomplete="off"
+                            onchange="markAnswered('btn-q1')">
+                        <label class="btn answer-label" for="q1a4">D. .form-check-button</label>
+                    </div>
+                </div>
+
+                <!-- Question 2 -->
+                <div class="card question-card p-4" id="q2">
+                    <h5 class="question-title">Câu 2: Đâu là thẻ HTML5 đúng để chứa các liên kết điều hướng (navigation
+                        links)?</h5>
+                    <div class="answers">
+                        <input type="radio" class="btn-check" name="question2" id="q2a1" autocomplete="off"
+                            onchange="markAnswered('btn-q2')">
+                        <label class="btn answer-label" for="q2a1">A. &lt;nav&gt;</label>
+
+                        <input type="radio" class="btn-check" name="question2" id="q2a2" autocomplete="off"
+                            onchange="markAnswered('btn-q2')">
+                        <label class="btn answer-label" for="q2a2">B. &lt;navigate&gt;</label>
+
+                        <input type="radio" class="btn-check" name="question2" id="q2a3" autocomplete="off"
+                            onchange="markAnswered('btn-q2')">
+                        <label class="btn answer-label" for="q2a3">C. &lt;menu&gt;</label>
+
+                        <input type="radio" class="btn-check" name="question2" id="q2a4" autocomplete="off"
+                            onchange="markAnswered('btn-q2')">
+                        <label class="btn answer-label" for="q2a4">D. &lt;header&gt;</label>
+                    </div>
+                </div>
+
+                <!-- Question 3 -->
+                <div class="card question-card p-4" id="q3">
+                    <h5 class="question-title">Câu 3: Thay đổi quan trọng nào sau đây có trong Bootstrap 5 so với
+                        Bootstrap 4?</h5>
+                    <div class="answers">
+                        <input type="radio" class="btn-check" name="question3" id="q3a1" autocomplete="off"
+                            onchange="markAnswered('btn-q3')">
+                        <label class="btn answer-label" for="q3a1">A. Yêu cầu tải kèm theo ReactJS</label>
+
+                        <input type="radio" class="btn-check" name="question3" id="q3a2" autocomplete="off"
+                            onchange="markAnswered('btn-q3')">
+                        <label class="btn answer-label" for="q3a2">B. Chuyển từ Flexbox sang CSS Grid làm mặc
+                            định</label>
+
+                        <input type="radio" class="btn-check" name="question3" id="q3a3" autocomplete="off"
+                            onchange="markAnswered('btn-q3')">
+                        <label class="btn answer-label" for="q3a3">C. Loại bỏ JQuery, thay bằng Vanilla JS</label>
+
+                        <input type="radio" class="btn-check" name="question3" id="q3a4" autocomplete="off"
+                            onchange="markAnswered('btn-q3')">
+                        <label class="btn answer-label" for="q3a4">D. Không hỗ trợ giao diện Mobile-first nữa</label>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4 mb-4 mb-lg-0">
+                <div class="card sidebar-card p-4 sticky-top" style="top: 80px; z-index: 100;">
+                    <h6 class="text-uppercase text-secondary fw-bold mb-3 d-flex align-items-center">
+                        <i class="bi bi-clock-history fs-5 me-2 text-primary"></i> Thời gian còn lại
+                    </h6>
+                    <div id="timer-display">45:00</div>
+
+                    <hr class="text-muted opacity-25 my-4">
+
+                    <h6 class="text-uppercase text-secondary fw-bold mb-3 d-flex align-items-center">
+                        <i class="bi bi-grid-3x3-gap-fill fs-5 me-2 text-primary"></i> Bảng câu hỏi
+                    </h6>
+                    <div class="d-flex flex-wrap mb-4" id="question-navigator">
+                        <a href="#q1" id="btn-q1" class="btn btn-outline-secondary question-nav-btn unanswered">1</a>
+                        <a href="#q2" id="btn-q2" class="btn btn-outline-secondary question-nav-btn unanswered">2</a>
+                        <a href="#q3" id="btn-q3" class="btn btn-outline-secondary question-nav-btn unanswered">3</a>
+                        <a href="#" class="btn btn-outline-secondary question-nav-btn unanswered">4</a>
+                        <a href="#" class="btn btn-outline-secondary question-nav-btn unanswered">5</a>
+                        <a href="#" class="btn btn-outline-secondary question-nav-btn unanswered">6</a>
+                        <a href="#" class="btn btn-outline-secondary question-nav-btn unanswered">7</a>
+                        <a href="#" class="btn btn-outline-secondary question-nav-btn unanswered">8</a>
+                        <a href="#" class="btn btn-outline-secondary question-nav-btn unanswered">9</a>
+                        <a href="#" class="btn btn-outline-secondary question-nav-btn unanswered">10</a>
+                    </div>
+
+                    <div class="d-flex flex-column gap-2 text-sm text-secondary mb-4">
+                        <div class="d-flex align-items-center"><span class="badge bg-success me-2 rounded-circle"
+                                style="width:16px;height:16px;">&nbsp;</span> Đã làm</div>
+                        <div class="d-flex align-items-center"><span
+                                class="badge bg-white border border-secondary me-2 rounded-circle"
+                                style="width:16px;height:16px;">&nbsp;</span> Chưa làm</div>
+                    </div>
+
+                    <button class="btn btn-primary btn-lg w-100 fw-bold shadow mt-2" onclick="submitExam()">
+                        <i class="bi bi-send-check-fill me-2"></i> Nộp bài ngay
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="spinner-border text-primary shadow-sm mb-4" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h3 class="text-primary fw-bold">Đang nộp bài...</h3>
+        <p class="text-muted fs-5">Hệ thống đang ghi nhận kết quả. Vui lòng không đóng trình duyệt!</p>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom Scripts -->
+    <script src="timer.js"></script>
+</body>
+
+</html>

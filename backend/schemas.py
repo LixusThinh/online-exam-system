@@ -18,7 +18,6 @@ class TokenData(BaseModel):
 # -----------------
 class UserBase(BaseModel):
     username: str
-    email: EmailStr
     full_name: Optional[str] = None
     role: UserRole = UserRole.STUDENT
 
@@ -27,8 +26,8 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     id: int
-    is_active: bool
-    is_admin: bool
+    is_active: bool = True
+    is_admin: bool = False
 
     class Config:
         from_attributes = True

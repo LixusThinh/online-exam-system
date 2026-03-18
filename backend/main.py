@@ -12,6 +12,8 @@ import auth
 from database import get_db, init_db
 from dependencies import get_current_user, require_role
 from models.user import UserRole
+import routers.auth
+import routers.profiles
 
 # 1. Khởi tạo DB trước khi App chạy
 init_db()
@@ -36,11 +38,11 @@ app.add_middleware(
 def read_root():
     return {"status": "success", "message": "Backend da thong nong!"}
 
-# ... Các route khác (register, login) giữ nguyên bên dưới ...
+# Register the new routers here
+app.include_router(routers.auth.router)
+app.include_router(routers.profiles.router)
 
-@app.get("/")
-def read_root():
-    return {"status": "success", "message": "Welcome to the Online Exam System API"}
+# ... Các route khác (register, login) giữ nguyên bên dưới ...
 
 @app.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -48,17 +50,11 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(models.user.User).filter(models.user.User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
-        
-    # Check if email exists
-    db_email = db.query(models.user.User).filter(models.user.User.email == user.email).first()
-    if db_email:
-        raise HTTPException(status_code=400, detail="Email already registered")
     
     # Create user
     hashed_password = auth.get_password_hash(user.password)
     db_user = models.user.User(
         username=user.username,
-        email=user.email,
         full_name=user.full_name,
         hashed_password=hashed_password,
         role=user.role
