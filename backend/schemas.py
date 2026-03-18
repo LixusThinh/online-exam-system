@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List, Dict
 from models.user import UserRole
 
 # -----------------
@@ -32,3 +32,31 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+# -----------------
+# Exam Schemas
+# -----------------
+class QuestionResponse(BaseModel):
+    id: int
+    content: str
+    options: Dict[str, str]
+
+    class Config:
+        from_attributes = True
+
+class ExamResponse(BaseModel):
+    id: int
+    title: str
+    questions: List[QuestionResponse]
+
+    class Config:
+        from_attributes = True
+
+class AnswerItem(BaseModel):
+    question_id: int
+    answer: str
+
+class SubmitResponse(BaseModel):
+    score: float
+    correct: int
+    total: int

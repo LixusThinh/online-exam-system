@@ -24,4 +24,5 @@ def get_db():
 def init_db():
     import models.user
     import models.quiz
+    import models.exam
     Base.metadata.create_all(bind=engine)

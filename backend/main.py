@@ -110,3 +110,71 @@ def draft_exam(current_user: models.user.User = Depends(require_role([UserRole.T
         "user": current_user.username,
         "role": current_user.role
     }
+
+from typing import List
+import models.exam
+from database import SessionLocal
+
+@app.on_event("startup")
+def init_exam_data():
+    db = SessionLocal()
+    try:
+        exam = db.query(models.exam.Exam).first()
+        if not exam:
+            exam = models.exam.Exam(title="Đề thi mẫu Lập trình Web Frontend")
+            db.add(exam)
+            db.commit()
+            db.refresh(exam)
+            
+            q1 = models.exam.Question(exam_id=exam.id, content="Trong Bootstrap 5, class nào được sử dụng để biến một nhóm radio buttons thành dạng nút bấm (button-like)?", options={"A": ".btn-radio", "B": ".btn-check", "C": ".radio-btn", "D": ".form-check-button"}, correct_option="B")
+            q2 = models.exam.Question(exam_id=exam.id, content="Đâu là thẻ HTML5 đúng để chứa các liên kết điều hướng (navigation links)?", options={"A": "<nav>", "B": "<navigate>", "C": "<menu>", "D": "<header>"}, correct_option="A")
+            q3 = models.exam.Question(exam_id=exam.id, content="Thay đổi quan trọng nào sau đây có trong Bootstrap 5 so với Bootstrap 4?", options={"A": "Yêu cầu tải kèm theo ReactJS", "B": "Chuyển từ Flexbox sang CSS Grid làm mặc định", "C": "Loại bỏ JQuery, thay bằng Vanilla JS", "D": "Không hỗ trợ giao diện Mobile-first nữa"}, correct_option="C")
+            q4 = models.exam.Question(exam_id=exam.id, content="Để trích xuất query parameters chuẩn REST trong FastAPI, ta sử dụng Class nào?", options={"A": "Path", "B": "Body", "C": "Query", "D": "Form"}, correct_option="C")
+            q5 = models.exam.Question(exam_id=exam.id, content="Thẻ nào dùng để tạo danh sách không có thứ tự trong HTML?", options={"A": "<ol>", "B": "<li>", "C": "<ul>", "D": "<dl>"}, correct_option="C")
+            
+            db.add_all([q1, q2, q3, q4, q5])
+            db.commit()
+    finally:
+        db.close()
+
+@app.get("/exams/{exam_id}", response_model=schemas.ExamResponse)
+def get_exam(exam_id: int, db: Session = Depends(get_db)):
+    # Đọc đề thi từ DB. Pydantic schema QuestionResponse sẽ tự lọc bỏ correct_option nên ko lo lộ
+    exam = db.query(models.exam.Exam).filter(models.exam.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    return exam
+
+@app.post("/exams/{exam_id}/submit", response_model=schemas.SubmitResponse)
+def submit_exam(
+    exam_id: int,
+    payload: List[schemas.AnswerItem],
+    db: Session = Depends(get_db),
+    current_user: models.user.User = Depends(get_current_user)
+):
+    # Lấy bài thi và hệ thống đúng/sai
+    exam = db.query(models.exam.Exam).filter(models.exam.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+        
+    questions_dict = {q.id: q.correct_option for q in exam.questions}
+    total = len(questions_dict)
+    if total == 0:
+        raise HTTPException(status_code=400, detail="Exam has no questions")
+
+    # So sánh các câu trả lời của user gửi lên
+    correct = 0
+    for item in payload:
+        if item.question_id in questions_dict and questions_dict[item.question_id] == item.answer:
+            correct += 1
+
+    # Tính điểm hệ 10
+    score = (correct / total) * 10.0
+    
+    # Lưu kết quả
+    result = models.exam.Result(user_id=current_user.id, exam_id=exam_id, score=score)
+    db.add(result)
+    db.commit()
+    
+    # Trả về thống kê con cho frontend
+    return {"score": score, "correct": correct, "total": total}

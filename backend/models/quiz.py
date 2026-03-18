@@ -29,7 +29,7 @@ class Quiz(Base):
 
     teacher = relationship("User", back_populates="quizzes")
     classroom = relationship("Class", back_populates="quizzes")
-    questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
+    questions = relationship("models.quiz.Question", back_populates="quiz", cascade="all, delete-orphan")
 
 class Question(Base):
     __tablename__ = "questions"
@@ -38,8 +38,8 @@ class Question(Base):
     content = Column(String, nullable=False)
     points = Column(Float, default=1.0)
 
-    quiz = relationship("Quiz", back_populates="questions")
-    choices = relationship("Choice", back_populates="question", cascade="all, delete-orphan")
+    quiz = relationship("models.quiz.Quiz", back_populates="questions")
+    choices = relationship("models.quiz.Choice", back_populates="question", cascade="all, delete-orphan")
 
 class Choice(Base):
     __tablename__ = "choices"
@@ -48,7 +48,7 @@ class Choice(Base):
     content = Column(String, nullable=False)
     is_correct = Column(Boolean, default=False)
 
-    question = relationship("Question", back_populates="choices")
+    question = relationship("models.quiz.Question", back_populates="choices")
 
 class Submission(Base):
     __tablename__ = "submissions"
