@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from database import get_db
-from models.user import User, UserRole
+from models import User, UserRole
 import schemas
 import auth
 
@@ -34,9 +34,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if user is None:
         raise credentials_exception
     
-    # Check if the user is active
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+   
         
     return user
 

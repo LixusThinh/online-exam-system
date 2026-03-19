@@ -1,53 +1,15 @@
 import os
 import sys
 import pandas as pd
-from sqlalchemy.orm import configure_mappers
 
-# --- BƯỚC 1: ÉP HỆ THỐNG NHẬN DIỆN ĐỊA BÀN ---
+# --- BƯỚC 1: CẤU HÌNH ĐƯỜNG DẪN ---
 sys.path.append(os.getcwd())
 sys.stdout.reconfigure(encoding='utf-8')
 
-# --- HACK MAGIC FIX ---
-# Bắt cóc hàm declarative_base() và Table.__init__ để đảm bảo chỉ có duy nhất 1 Base Registry được tái sử dụng!
-# Và mọi Model ghi đè nhau sẽ được coi là extend_existing=True!
-import sqlalchemy.orm
-
-# Nạp database Base chuẩn
-from database import SessionLocal, engine, Base as DBBase
-
-old_declarative_base = sqlalchemy.orm.declarative_base
-def fake_declarative_base(*args, **kwargs):
-    return DBBase
-sqlalchemy.orm.declarative_base = fake_declarative_base
-
-try:
-    import sqlalchemy.ext.declarative
-    sqlalchemy.ext.declarative.declarative_base = fake_declarative_base
-except ImportError:
-    pass
-
-import sqlalchemy.schema
-old_table_init = sqlalchemy.schema.Table.__init__
-def fake_table_init(self, *args, **kwargs):
-    kwargs['extend_existing'] = True
-    old_table_init(self, *args, **kwargs)
-sqlalchemy.schema.Table.__init__ = fake_table_init
-
-
-# --- BƯỚC 2: IMPORT TẤT CẢ MODEL THEO THỨ TỰ YÊU CẦU ---
-try:
-    import models.user       # Nạp User trước
-    import models.classes    # Nạp Class sau
-    import models.quiz
-    import models.question
-    import models.submission
-    
-    # Ép SQLAlchemy sắp xếp lại các mối quan hệ (Fix lỗi Mapper triệt để)
-    configure_mappers()
-    
-    from models.question import Question, Choice
-except Exception as e:
-    print(f"Lỗi khi khởi tạo Model: {e}")
+# --- KHÔNG CÒN HACK MAGIC FIX ---
+# Import bình thường từ database.py và models.py chuẩn SQLAlchemy 2.0
+from database import SessionLocal, init_db
+from models import Question, Choice
 
 def run_import(file_path="questions.xlsx"):
     print(f"🚀 Đang đọc file: '{file_path}'...")
@@ -60,6 +22,9 @@ def run_import(file_path="questions.xlsx"):
     except Exception as e:
         return False, 0, f"Lỗi đọc Excel: {e}"
         
+    # Đảm bảo các bảng đã được tạo
+    init_db()
+    
     db = SessionLocal()
     imported_count = 0
     
@@ -73,7 +38,7 @@ def run_import(file_path="questions.xlsx"):
             # Tạo Question
             new_q = Question(content=content, quiz_id=quiz_id)
             db.add(new_q)
-            db.flush() # Lấy ID của câu hỏi vừa tạo
+            db.flush() # Lấy ID của câu hỏi vừa tạo để gán cho các Choice
             
             # Xử lý các đáp án (Choice)
             choice_cols = [c for c in df.columns if str(c).startswith('choice_')]

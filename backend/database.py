@@ -1,18 +1,20 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./azota_clone.db"
 
+# Khởi tạo engine
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
 )
+
+# Khởi tạo SessionLocal
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# ĐÂY LÀ DÒNG QUAN TRỌNG NHẤT
+# Khởi tạo Base chuẩn SQLAlchemy 2.0
 Base = declarative_base()
 
-# Hàm lấy DB session
+# Dependency function dùng cho FastAPI
 def get_db():
     db = SessionLocal()
     try:
@@ -20,8 +22,7 @@ def get_db():
     finally:
         db.close()
 
-# Hàm khởi tạo bảng (Để import bên trong hàm để tránh vòng lặp)
 def init_db():
-    import models.user
-    import models.quiz
+    # Phải import models vào đây để Base nhận diện được các bảng trước khi tạo DB
+    import models
     Base.metadata.create_all(bind=engine)
