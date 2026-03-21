@@ -4,6 +4,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from datetime import timedelta
+from typing import List, Optional
+import uuid
 
 # Import mấy cái "hàng nhà làm" của mày vào đây
 import models
@@ -31,12 +33,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/")
-def read_root():
-    return {"status": "success", "message": "Backend da thong nong!"}
-
-# ... Các route khác (register, login) giữ nguyên bên dưới ...
 
 @app.get("/")
 def read_root():
@@ -100,7 +96,7 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
     """
     return current_user
 
-from typing import Optional
+
 
 # -----------------
 # Exam (Quiz) Endpoints
@@ -353,3 +349,146 @@ def submit_exam(
         "status": "SUBMITTED",
         "message": f"Nộp bài thành công! Điểm: {score}/{total_points}"
     }
+
+# -----------------
+# Class CRUD Endpoints
+# -----------------
+
+@app.post("/classes", response_model=schemas.ClassResponse, status_code=status.HTTP_201_CREATED)
+def create_class(
+    class_data: schemas.ClassCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Tạo lớp học mới. Chỉ TEACHER/ADMIN được tạo.
+    Nếu không truyền invite_code, hệ thống tự sinh mã ngẫu nhiên 8 ký tự.
+    """
+    invite_code = class_data.invite_code or uuid.uuid4().hex[:8].upper()
+
+    # Check trùng invite_code
+    existing = db.query(models.Class).filter(models.Class.invite_code == invite_code).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Mã mời này đã tồn tại, hãy chọn mã khác")
+
+    db_class = models.Class(
+        name=class_data.name,
+        invite_code=invite_code,
+        teacher_id=current_user.id
+    )
+    db.add(db_class)
+    db.commit()
+    db.refresh(db_class)
+    return db_class
+
+@app.get("/classes", response_model=List[schemas.ClassResponse])
+def get_classes(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Lấy danh sách lớp học theo phân quyền:
+    - ADMIN: Thấy toàn bộ lớp trong hệ thống.
+    - TEACHER: Chỉ thấy lớp do mình tạo.
+    - STUDENT: Chỉ thấy các lớp mình đã tham gia (qua bảng enrollments).
+    """
+    if current_user.role == UserRole.ADMIN:
+        return db.query(models.Class).all()
+    elif current_user.role == UserRole.TEACHER:
+        return db.query(models.Class).filter(models.Class.teacher_id == current_user.id).all()
+    else:
+        return current_user.enrolled_classes
+
+# -----------------
+# Question Management Endpoints
+# -----------------
+
+@app.post("/exams/{exam_id}/questions", response_model=List[schemas.QuestionResponse], status_code=status.HTTP_201_CREATED)
+def add_questions(
+    exam_id: int,
+    questions: List[schemas.QuestionCreate],
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Thêm batch câu hỏi kèm đáp án vào đề thi.
+    - Chỉ Teacher/Admin sở hữu đề thi mới được thêm.
+    - Mỗi câu hỏi đi kèm mảng choices.
+    """
+    # Check đề thi tồn tại
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == exam_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Đề thi không tồn tại")
+
+    # Check quyền sở hữu (trừ ADMIN thì bypass)
+    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền thêm câu hỏi vào đề thi này")
+
+    created_questions = []
+    for q_data in questions:
+        # Tạo Question
+        db_question = models.Question(
+            quiz_id=exam_id,
+            content=q_data.content,
+            points=q_data.points
+        )
+        db.add(db_question)
+        db.flush()  # Flush để lấy id của question trước khi tạo choices
+
+        # Tạo Choices cho question này
+        for c_data in q_data.choices:
+            db_choice = models.Choice(
+                question_id=db_question.id,
+                content=c_data.content,
+                is_correct=c_data.is_correct
+            )
+            db.add(db_choice)
+
+        created_questions.append(db_question)
+
+    db.commit()
+    # Refresh tất cả để load relationships (choices)
+    for q in created_questions:
+        db.refresh(q)
+
+    return created_questions
+
+# -----------------
+# Submission History & Stats Endpoints
+# -----------------
+
+@app.get("/submissions/me", response_model=List[schemas.SubmissionResponse])
+def get_my_submissions(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.STUDENT]))
+):
+    """
+    Student xem lịch sử các bài đã nộp và điểm số của mình.
+    """
+    submissions = db.query(models.Submission).filter(
+        models.Submission.student_id == current_user.id
+    ).order_by(models.Submission.started_at.desc()).all()
+    return submissions
+
+@app.get("/exams/{exam_id}/submissions", response_model=List[schemas.SubmissionResponse])
+def get_exam_submissions(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Teacher/Admin xem danh sách điểm của tất cả học sinh đã nộp bài cho đề thi này.
+    - Check đề thi tồn tại.
+    - Check quyền sở hữu (trừ ADMIN).
+    """
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == exam_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Đề thi không tồn tại")
+
+    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Bạn không có quyền xem kết quả đề thi này")
+
+    submissions = db.query(models.Submission).filter(
+        models.Submission.quiz_id == exam_id
+    ).order_by(models.Submission.finished_at.desc()).all()
+    return submissions
