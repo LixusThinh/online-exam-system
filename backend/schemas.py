@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime
 from models import UserRole
 
 # -----------------
@@ -26,7 +27,22 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     id: int
-   
+
+    class Config:
+        from_attributes = True
+
+# -----------------
+# Class (Lớp học) Schemas
+# -----------------
+class ClassCreate(BaseModel):
+    name: str
+    invite_code: Optional[str] = None  # Nếu không truyền thì auto-gen
+
+class ClassResponse(BaseModel):
+    id: int
+    name: str
+    invite_code: str
+    teacher_id: int
 
     class Config:
         from_attributes = True
@@ -49,10 +65,31 @@ class QuizUpdate(BaseModel):
     password: Optional[str] = None
     class_id: Optional[int] = None
 
+# -----------------
+# Choice & Question Schemas
+# -----------------
+class ChoiceCreate(BaseModel):
+    content: str
+    is_correct: bool = False
+
+class ChoiceResponse(BaseModel):
+    id: int
+    content: str
+    is_correct: bool
+
+    class Config:
+        from_attributes = True
+
+class QuestionCreate(BaseModel):
+    content: str
+    points: float = 1.0
+    choices: List[ChoiceCreate]
+
 class QuestionResponse(BaseModel):
     id: int
     content: str
     points: float
+    choices: List[ChoiceResponse] = []
 
     class Config:
         from_attributes = True
@@ -80,3 +117,14 @@ class SubmitResponse(BaseModel):
     total_points: float
     status: str
     message: str
+
+class SubmissionResponse(BaseModel):
+    id: int
+    quiz_id: int
+    score: Optional[float] = None
+    status: str
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
