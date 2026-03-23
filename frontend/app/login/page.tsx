@@ -31,7 +31,7 @@ export default function LoginPage() {
       const role = response.user?.role;
 
       if (role === "admin" || role === "teacher") {
-        router.push("/teacher/manage-exams");
+        router.push("/teacher/dashboard");
       } else if (role === "student") {
         router.push("/student");
       } else {

@@ -453,6 +453,91 @@ def add_questions(
 
     return created_questions
 
+@app.get("/exams/{exam_id}/questions_for_teacher", response_model=List[schemas.QuestionResponse])
+def get_questions_for_teacher(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Giáo viên lấy danh sách câu hỏi CÓ KÈM ĐÁP ÁN ĐÚNG.
+    """
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == exam_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Đề thi không tồn tại")
+    
+    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Không có quyền xem đáp án đề thi này")
+        
+    questions = db.query(models.Question).filter(models.Question.quiz_id == exam_id).all()
+    return questions
+
+@app.put("/questions/{question_id}", response_model=schemas.QuestionResponse)
+def update_question(
+    question_id: int,
+    question_update: schemas.QuestionUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Giáo viên sửa câu hỏi và đáp án.
+    """
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Câu hỏi không tồn tại")
+        
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == question.quiz_id).first()
+    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Không có quyền sửa câu hỏi của đề thi khác")
+        
+    # Cập nhật nội dung câu hỏi
+    if question_update.content is not None:
+        question.content = question_update.content
+    if question_update.points is not None:
+        question.points = question_update.points
+        
+    # Cập nhật Choices
+    if question_update.choices is not None:
+        # Xóa các choice cũ và thêm choice mới (Cách đơn giản nhất)
+        # Hoặc update thông minh dựa vào ID
+        existing_choices = {c.id: c for c in question.choices}
+        
+        # Để đơn giản và an toàn, ta xóa hết các choice của question này rồi tạo lại, hoặc update mapping
+        db.query(models.Choice).filter(models.Choice.question_id == question_id).delete()
+        
+        for c_data in question_update.choices:
+            new_choice = models.Choice(
+                question_id=question.id,
+                content=c_data.content,
+                is_correct=c_data.is_correct
+            )
+            db.add(new_choice)
+
+    db.commit()
+    db.refresh(question)
+    return question
+
+@app.delete("/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_question(
+    question_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Giáo viên xóa câu hỏi khỏi đề thi.
+    """
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Câu hỏi không tồn tại")
+        
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == question.quiz_id).first()
+    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Không có quyền xóa câu hỏi của người khác")
+        
+    db.delete(question)
+    db.commit()
+    return None
+
 # -----------------
 # Submission History & Stats Endpoints
 # -----------------

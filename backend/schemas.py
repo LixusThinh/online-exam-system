@@ -94,6 +94,16 @@ class QuestionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ChoiceUpdate(BaseModel):
+    id: Optional[int] = None
+    content: str
+    is_correct: bool = False
+
+class QuestionUpdate(BaseModel):
+    content: Optional[str] = None
+    points: Optional[float] = None
+    choices: Optional[List[ChoiceUpdate]] = None
+
 class QuizResponse(QuizBase):
     id: int
     teacher_id: int
@@ -121,6 +131,14 @@ class SubmitResponse(BaseModel):
 class SubmissionResponse(BaseModel):
     id: int
     quiz_id: int
+    student: UserResponse
+    score: Optional[float] = None
+    status: str
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
     score: Optional[float] = None
     status: str
     started_at: Optional[datetime] = None
