@@ -97,12 +97,12 @@ node_modules/
 /coverage
 
 # next.js
-/.next/
-/out/
+.next/
+out/
 build/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
