@@ -97,5 +97,6 @@ class Submission(Base):
     status = Column(Enum(SubmissionStatus), default=SubmissionStatus.IN_PROGRESS)
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     finished_at = Column(DateTime(timezone=True), onupdate=func.now())
+    cheat_count = Column(Integer, default=0)
 
     student = relationship("User", back_populates="submissions")

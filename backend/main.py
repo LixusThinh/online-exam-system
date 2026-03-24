@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -345,13 +345,17 @@ def submit_exam(
         submission.score = score
         submission.status = models.SubmissionStatus.SUBMITTED
         submission.finished_at = func.now()
+        # Nếu FE gửi cheat_count lên thì cập nhật, nếu không thì giữ nguyên (hoặc cộng thêm)
+        if payload.cheat_count > 0:
+            submission.cheat_count = payload.cheat_count
     else:
         submission = models.Submission(
             student_id=current_user.id,
             quiz_id=exam_id,
             score=score,
             status=models.SubmissionStatus.SUBMITTED,
-            finished_at=func.now()
+            finished_at=func.now(),
+            cheat_count=payload.cheat_count
         )
         db.add(submission)
 
@@ -361,7 +365,8 @@ def submit_exam(
         "score": score,
         "total_points": total_points,
         "status": "SUBMITTED",
-        "message": f"Nộp bài thành công! Điểm: {score}/{total_points}"
+        "message": f"Nộp bài thành công! Điểm: {score}/{total_points}",
+        "cheat_count": submission.cheat_count
     }
 
 # -----------------
@@ -591,3 +596,54 @@ def get_exam_submissions(
         models.Submission.quiz_id == exam_id
     ).order_by(models.Submission.finished_at.desc()).all()
     return submissions
+
+# -----------------
+# WebSocket Anti-Cheat
+# -----------------
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/anti-cheat/{exam_id}/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, exam_id: int, user_id: int):
+    db: Session = next(get_db())
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "cheat_detected":
+                # Tìm hoặc tạo submission IN_PROGRESS để tăng cheat_count
+                submission = db.query(models.Submission).filter(
+                    models.Submission.student_id == user_id,
+                    models.Submission.quiz_id == exam_id,
+                    models.Submission.status == models.SubmissionStatus.IN_PROGRESS
+                ).first()
+                
+                if not submission:
+                    submission = models.Submission(
+                        student_id=user_id,
+                        quiz_id=exam_id,
+                        status=models.SubmissionStatus.IN_PROGRESS
+                    )
+                    db.add(submission)
+                
+                submission.cheat_count += 1
+                db.commit()
+                await websocket.send_text(f"Warning: Cheat detected! Total: {submission.cheat_count}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    finally:
+        db.close()

@@ -24,7 +24,8 @@ import {
   HelpCircle,
   ShieldCheck
 } from "lucide-react";
-import { getExam, submitExam } from "@/lib/api";
+import confetti from "canvas-confetti";
+import { getExam, submitExam, getMe } from "@/lib/api";
 
 export default function TakeExamPage() {
   const router = useRouter();
@@ -38,17 +39,38 @@ export default function TakeExamPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [cheatCount, setCheatCount] = useState(0);
+  const [showCheatWarning, setShowCheatWarning] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
 
   const fetchExamData = useCallback(async (token: string) => {
     try {
-      const data = await getExam(Number(id), token);
-      if (data.detail) throw new Error(data.detail);
-      setExam(data);
-      if (data.time_limit) {
-        setTimeLeft(data.time_limit * 60);
+      const [examData, userData] = await Promise.all([
+        getExam(Number(id), token),
+        getMe(token)
+      ]);
+      
+      if (examData.detail) throw new Error(examData.detail);
+      setExam(examData);
+      setCurrentUser(userData);
+      
+      if (examData.time_limit) {
+        setTimeLeft(examData.time_limit * 60);
       }
+
+      // Initialize WebSocket for Anti-cheat
+      const wsUrl = `ws://127.0.0.1:8000/ws/anti-cheat/${id}/${userData.id}`;
+      const socket = new WebSocket(wsUrl);
+      
+      socket.onmessage = (event) => {
+        console.log("WS Message:", event.data);
+      };
+
+      socketRef.current = socket;
+
     } catch (err: any) {
       setError(err.message || "Không thể tải đề thi.");
     } finally {
@@ -68,8 +90,26 @@ export default function TakeExamPage() {
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (socketRef.current) socketRef.current.close();
     };
   }, [fetchExamData, router]);
+
+  // Anti-cheat: Detect tab switching
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && !isFinished) {
+        setCheatCount(prev => prev + 1);
+        setShowCheatWarning(true);
+        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+          socketRef.current.send("cheat_detected");
+        }
+        setTimeout(() => setShowCheatWarning(false), 5000);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isFinished]);
 
   useEffect(() => {
     if (timeLeft !== null && timeLeft > 0 && !isFinished) {
@@ -95,7 +135,7 @@ export default function TakeExamPage() {
   const handleSubmit = async () => {
     if (isSubmitting || isFinished) return;
 
-    // Validate if all questions are answered (optional, but good for UX)
+    // Validate if all questions are answered
     const answeredCount = Object.keys(answers).length;
     const totalCount = exam?.questions?.length || 0;
 
@@ -117,10 +157,20 @@ export default function TakeExamPage() {
         choice_id: cId,
       }));
 
-      const res = await submitExam(Number(id), submissionData, t);
+      const res = await submitExam(Number(id), submissionData, t, cheatCount);
       setResult(res);
       setIsFinished(true);
+      
+      // FIREWORKS!
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#4f46e5', '#10b981', '#f59e0b']
+      });
+
       if (timerRef.current) clearInterval(timerRef.current);
+      if (socketRef.current) socketRef.current.close();
     } catch (err: any) {
       alert("Lỗi nộp bài: " + err.message);
     } finally {
@@ -165,13 +215,21 @@ export default function TakeExamPage() {
           </div>
           <div className="space-y-2">
             <h1 className="text-3xl font-black text-slate-900">Nộp bài thành công!</h1>
-            <p className="text-slate-500 font-medium leading-relaxed">Kết quả nháp đã được lưu trữ an toàn trên máy chủ đám mây.</p>
+            <p className="text-slate-500 font-medium leading-relaxed">Kết quả đã được ghi nhận vào hệ thống.</p>
           </div>
 
           <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 mb-4">
-            <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Điểm số ước tính</div>
-            <div className="text-6xl font-black text-indigo-600">{result?.score?.toFixed(1) || "0.0"}</div>
-            <div className="text-slate-400 font-medium text-sm mt-2">Tổng điểm tối đa: {result?.total_points || "10"}</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Điểm số</div>
+                <div className="text-4xl font-black text-indigo-600">{result?.score?.toFixed(1) || "0.0"}</div>
+              </div>
+              <div className="border-l border-slate-200">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Vi phạm (Cheat)</div>
+                <div className={`text-4xl font-black ${cheatCount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{cheatCount}</div>
+              </div>
+            </div>
+            <div className="text-slate-400 font-bold text-[10px] mt-4 uppercase tracking-tighter">Tổng điểm tối đa: {result?.total_points || "10"}</div>
           </div>
 
           <Button onClick={() => router.push("/student/dashboard")} className="w-full h-12 bg-slate-900 hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg transition-all">
@@ -358,6 +416,22 @@ export default function TakeExamPage() {
         </div>
 
       </main>
+
+      {/* ANTI-CHEAT WARNING OVERLAY */}
+      {showCheatWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-rose-600/20 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl border-4 border-rose-500 text-center max-w-sm mx-4 animate-in zoom-in duration-300">
+            <AlertTriangle className="h-16 w-16 text-rose-500 mx-auto mb-4 animate-bounce" />
+            <h2 className="text-2xl font-black text-slate-900 mb-2">CẢNH BÁO VI PHẠM!</h2>
+            <p className="text-rose-600 font-bold mb-4">Hệ thống phát hiện bạn vừa rời khỏi tab làm bài.</p>
+            <div className="bg-rose-50 p-3 rounded-xl border border-rose-100 text-rose-700 text-xs font-medium">
+              Số lần vi phạm: <span className="text-lg font-black">{cheatCount}</span>
+            </div>
+            <p className="text-[10px] text-slate-400 mt-4 uppercase font-bold tracking-widest">Hành vi này đã được ghi nhận vào hệ thống</p>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
