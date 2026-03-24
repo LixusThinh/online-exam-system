@@ -108,8 +108,8 @@ export default function SubmissionsPage() {
                       <TableHead className="w-[50px] text-center">STT</TableHead>
                       <TableHead className="min-w-[200px]">Tên Học Sinh</TableHead>
                       <TableHead className="w-[200px] text-center">Ngày Nộp</TableHead>
-                      <TableHead className="w-[150px] text-center">Trạng Thái</TableHead>
-                      <TableHead className="text-right w-[150px]">Điểm Số</TableHead>
+                      <TableHead className="w-[120px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">Vi phạm (Cheat)</TableHead>
+                      <TableHead className="text-right w-[150px] font-black uppercase text-[10px] tracking-widest text-slate-400">Điểm Số</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -119,9 +119,6 @@ export default function SubmissionsPage() {
                         <TableCell>
                           <div className="font-semibold text-slate-900 dark:text-slate-100">
                             {sub.student?.full_name || sub.student?.username || "Ẩn danh"}
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            ID: {sub.student?.id || "N/A"}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
@@ -140,6 +137,11 @@ export default function SubmissionsPage() {
                               Đang làm
                             </span>
                           )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`font-black text-lg ${sub.cheat_count > 0 ? 'text-rose-500 animate-pulse' : 'text-emerald-500'}`}>
+                            {sub.cheat_count || 0}
+                          </span>
                         </TableCell>
                         <TableCell className="text-right">
                           {sub.status === "submitted" ? (
