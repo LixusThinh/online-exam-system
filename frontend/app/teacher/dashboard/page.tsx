@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Table, 
@@ -24,7 +24,8 @@ import {
   GraduationCap,
   Users,
   Award,
-  ChevronRight
+  ChevronRight,
+  Clock
 } from "lucide-react";
 import { getExams, deleteExam } from "@/lib/api";
 
