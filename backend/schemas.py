@@ -139,10 +139,3 @@ class SubmissionResponse(BaseModel):
 
     class Config:
         from_attributes = True
-    score: Optional[float] = None
-    status: str
-    started_at: Optional[datetime] = None
-    finished_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

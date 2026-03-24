@@ -76,7 +76,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     
     # Generate token
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # Sử dụng 1440 phút (24 tiếng) như Lão đại yêu cầu
+    access_token_expires = timedelta(minutes=1440)
     access_token = auth.create_access_token(
         data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
     )
@@ -89,6 +90,19 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # -----------------
 # Protected Endpoints Examples
 # -----------------
+@app.get("/users", response_model=List[schemas.UserResponse])
+def get_all_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    ADMIN ONLY: Lấy danh sách toàn bộ người dùng trong hệ thống.
+    """
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền truy cập dữ liệu tối mật này!"
+        )
+    return db.query(models.User).all()
+
+
 @app.get("/users/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     """
