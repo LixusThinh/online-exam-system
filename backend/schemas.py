@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-from models import UserRole
 
 # -----------------
 # Token Schemas
@@ -20,7 +19,8 @@ class TokenData(BaseModel):
 class UserBase(BaseModel):
     username: str
     full_name: Optional[str] = None
-    role: UserRole = UserRole.STUDENT
+    role: str = "student"
+    permissions: List[str] = []
 
 class UserCreate(UserBase):
     password: str

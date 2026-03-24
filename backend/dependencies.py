@@ -3,9 +3,11 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, UserRole
+from models import User
 import schemas
 import auth
+from config import settings
+from redis_mgr import redis_mgr
 
 # Define the OAuth2 scheme for token extraction
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -21,8 +23,14 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username: str = payload.get("sub")
+        jti: str = payload.get("jti")
+        
+        if jti and redis_mgr.is_token_blacklisted(jti):
+            raise credentials_exception
+            
+        # Keep permissions in request state if needed, or re-fetch from user
         if username is None:
             raise credentials_exception
         token_data = schemas.TokenData(username=username)
@@ -38,20 +46,23 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         
     return user
 
-def require_role(allowed_roles: list[UserRole]):
+def require_permissions(required_permissions: list[str]):
     """
-    Dependency generator for Role-Based Access Control (RBAC).
-    Returns a dependency that checks if the current user has one of the allowed roles.
+    Dependency generator for Attribute-Based Access Control (ABAC).
+    Returns a dependency that checks if the current user has ALL of the required permissions.
     """
-    def role_dependency(current_user: User = Depends(get_current_user)):
-        if current_user.role not in allowed_roles:
+    def permission_dependency(current_user: User = Depends(get_current_user)):
+        user_perms = set(auth.get_permissions(current_user))
+        
+        # If user has wildcard permission, grant access
+        if "*" in user_perms:
+            return current_user
+            
+        # Check if user has all required permissions
+        if not all(perm in user_perms for perm in required_permissions):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to perform this action."
+                detail="Xinh xít! Lão đại ơi, con hàng này đéo đủ thẩm quyền để vào đây!"
             )
         return current_user
-    return role_dependency
-
-# Examples of pre-configured role dependencies:
-get_current_admin = require_role([UserRole.ADMIN])
-get_current_teacher_or_admin = require_role([UserRole.TEACHER, UserRole.ADMIN])
+    return permission_dependency
