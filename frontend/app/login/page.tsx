@@ -30,10 +30,12 @@ export default function LoginPage() {
 
       const role = response.user?.role;
 
-      if (role === "admin" || role === "teacher") {
+      if (role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (role === "teacher") {
         router.push("/teacher/dashboard");
       } else if (role === "student") {
-        router.push("/student");
+        router.push("/student/dashboard");
       } else {
         throw new Error("Không xác định được quyền truy cập. Vui lòng liên hệ quản trị viên.");
       }
