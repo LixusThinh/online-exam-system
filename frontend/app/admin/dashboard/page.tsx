@@ -139,8 +139,8 @@ export default function AdminDashboard() {
               <ShieldAlert className="h-6 w-6 text-black" />
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-black tracking-[0.2em] text-[#00ff9f]">ADM-OS <span className="text-white opacity-50">v4.0</span></span>
-              <span className="text-[10px] font-bold text-[#00ff9f]/60 animate-pulse underline decoration-double">GOD MODE ENABLED</span>
+              <span className="text-xl font-black tracking-[0.2em] text-[#00ff9f]">ADM-OS <span className="text-white">v4.0</span></span>
+              <span className="text-[10px] font-bold text-[#00ff9f] animate-pulse underline decoration-double">GOD MODE ENABLED</span>
             </div>
           </div>
           
@@ -177,7 +177,7 @@ export default function AdminDashboard() {
                     <stat.icon className="w-24 h-24" style={{ color: `rgb(${stat.color})` }} />
                 </div>
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-[10px] font-black tracking-[0.3em] opacity-40 uppercase">{stat.label}</CardTitle>
+                    <CardTitle className="text-[10px] font-black tracking-[0.3em] text-slate-400 uppercase">{stat.label}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="text-4xl font-black tracking-tighter" style={{ color: `rgb(${stat.color})` }}>
@@ -209,18 +209,18 @@ export default function AdminDashboard() {
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                     <Table>
-                        <TableHeader className="bg-black">
-                            <TableRow className="border-[#00ff9f]/10 hover:bg-transparent">
-                                <TableHead className="text-[#00ff9f]/40 text-[10px] uppercase font-black tracking-widest">ID</TableHead>
-                                <TableHead className="text-[#00ff9f]/40 text-[10px] uppercase font-black tracking-widest font-mono">USERNAME</TableHead>
-                                <TableHead className="text-[#00ff9f]/40 text-[10px] uppercase font-black tracking-widest">ROLE</TableHead>
-                                <TableHead className="text-right text-[#00ff9f]/40 text-[10px] uppercase font-black tracking-widest px-6">CMD</TableHead>
+                        <TableHeader className="bg-slate-900/50">
+                            <TableRow className="border-[#00ff9f]/20 hover:bg-transparent">
+                                <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest">ID</TableHead>
+                                <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest font-mono">USERNAME</TableHead>
+                                <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest">ROLE</TableHead>
+                                <TableHead className="text-right text-emerald-400 text-[10px] uppercase font-black tracking-widest px-6">CMD</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {users.map((user) => (
-                                <TableRow key={user.id} className="border-[#00ff9f]/5 hover:bg-[#00ff9f]/5 transition-colors group">
-                                    <TableCell className="text-[#00ff9f]/30 font-bold text-xs">#{user.id}</TableCell>
+                                <TableRow key={user.id} className="border-[#00ff9f]/10 hover:bg-[#00ff9f]/10 transition-colors group">
+                                    <TableCell className="text-slate-400 font-bold text-xs font-mono">#{user.id}</TableCell>
                                     <TableCell className="font-bold text-sm text-white">{user.username}</TableCell>
                                     <TableCell>
                                         <span className={`text-[10px] px-2 py-0.5 font-black uppercase tracking-widest border border-current ${
@@ -260,8 +260,8 @@ export default function AdminDashboard() {
                             <div key={c.id} className="bg-black p-4 flex items-center justify-between group hover:bg-[#00ff9f]/5 transition-colors">
                                 <div className="space-y-1">
                                     <div className="text-sm font-black text-white">{c.name}</div>
-                                    <div className="text-[10px] font-bold text-[#00ff9f]/40 flex items-center gap-2 uppercase">
-                                        <Lock className="h-3 w-3" /> Code: <span className="text-white">{c.invite_code}</span>
+                                    <div className="text-[10px] font-bold text-slate-400 flex items-center gap-2 uppercase">
+                                        <Lock className="h-3 w-3 text-emerald-400" /> CODE: <span className="text-white font-mono">{c.invite_code}</span>
                                     </div>
                                 </div>
                                 <Button 
@@ -291,12 +291,12 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent className="flex-1 p-4 font-mono text-[11px] overflow-y-auto space-y-2 scrollbar-hide">
                     {logs.map((log, i) => (
-                        <div key={i} className={`flex gap-3 leading-relaxed ${log.includes("CRITICAL") ? 'text-rose-500' : 'text-[#00ff9f]/60'}`}>
-                            <span className="opacity-30 shrink-0">{logs.length - i}</span>
-                            <span className="break-all">{log}</span>
+                        <div key={i} className={`flex gap-3 leading-relaxed ${log.includes("CRITICAL") ? 'text-rose-500' : 'text-green-400'}`}>
+                            <span className="opacity-60 shrink-0 text-slate-500">{logs.length - i}</span>
+                            <span className="break-all font-bold tracking-tight">{log}</span>
                         </div>
                     ))}
-                    {logs.length === 0 && <div className="text-[#00ff9f]/20 animate-pulse italic">Awaiting input...</div>}
+                    {logs.length === 0 && <div className="text-green-900 animate-pulse italic">Awaiting input...</div>}
                 </CardContent>
                 <CardFooter className="border-t border-[#00ff9f]/10 p-3 bg-black flex items-center gap-2 overflow-hidden">
                     <span className="text-[#00ff9f] animate-bounce">&gt;_</span>
