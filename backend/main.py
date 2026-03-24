@@ -230,7 +230,7 @@ def join_class(
 ):
     """
     Sinh viên dùng invite_code để tham gia lớp học.
-    - Chỉ STUDENT mới được gọi endpoint này (đã dùng Depends(require_role)).
+    - Chỉ STUDENT mới được gọi endpoint này (đã dùng Depends(require_permissions)).
     - Check trùng lặp: nếu đã join rồi thì báo lỗi.
     """
     # Tìm lớp theo invite_code
@@ -412,7 +412,7 @@ def get_classes(
 def get_class_exams(
     class_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(get_current_user)
 ):
     """
     Lấy danh sách đề thi của một lớp học cụ thể.
