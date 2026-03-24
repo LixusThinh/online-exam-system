@@ -25,7 +25,11 @@ import {
   Users,
   Award,
   ChevronRight,
-  Clock
+  Clock,
+  Activity,
+  Bell,
+  CheckCircle2,
+  AlertTriangle
 } from "lucide-react";
 import { getExams, deleteExam, getClasses, createClass } from "@/lib/api";
 
@@ -37,6 +41,7 @@ export default function TeacherDashboard() {
   const [newClassName, setNewClassName] = useState("");
   const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [error, setError] = useState("");
+  const [liveEvents, setLiveEvents] = useState<{id: number, message: string, type: string}[]>([]);
 
   const fetchData = useCallback(async (token: string) => {
     try {
@@ -64,6 +69,37 @@ export default function TeacherDashboard() {
       router.push("/login");
     }
   }, [fetchData, router]);
+
+  // LIVE MONITORING WEBSOCKET (Anti-Cheat integration)
+  useEffect(() => {
+    // Chúng ta sẽ lắng nghe các event "mới nhất" từ hệ thống
+    // Ở bản Dashboard tổng, ta có thể lắng nghe một kênh broadcast hoặc loop qua các exam active
+    // Demo: Kết nối tới server để nhận thông báo mới nhất
+    const ws = new WebSocket(`ws://localhost:8000/ws/anti-cheat/all/global`);
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const msg = data.message || "Phát hiện hoạt động mới!";
+        setLiveEvents(prev => [{
+            id: Date.now(), 
+            message: msg, 
+            type: data.type || "info"
+        }, ...prev].slice(0, 5));
+      } catch (e) {
+        // Fallback cho text thô
+        if (event.data.includes("Cheat")) {
+            setLiveEvents(prev => [{
+                id: Date.now(),
+                message: "⚠️ " + event.data,
+                type: "warning"
+            }, ...prev].slice(0, 5));
+        }
+      }
+    };
+
+    return () => ws.close();
+  }, []);
 
   const handleCreateClass = async () => {
     if (!newClassName.trim()) return;
@@ -187,13 +223,19 @@ export default function TeacherDashboard() {
             </Card>
             <Card className="border-slate-200 shadow-sm bg-white hover:border-amber-200 transition-all duration-300 group">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest">Hoạt động 24h</CardTitle>
-                    <div className="p-2 bg-amber-50 rounded-lg group-hover:scale-110 transition-transform"><Award className="h-4 w-4 text-amber-600" /></div>
+                    <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest">Giám Sát Trực Tuyến</CardTitle>
+                    <div className="p-2 bg-amber-50 rounded-lg group-hover:scale-110 transition-transform"><Activity className="h-4 w-4 text-amber-600" /></div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-3xl font-black text-slate-900">Live</div>
+                    <div className="text-3xl font-black text-amber-600 flex items-center gap-2">
+                        Live
+                        <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                        </span>
+                    </div>
                     <div className="mt-2 flex items-center text-[10px] font-bold text-amber-600 tracking-tighter uppercase">
-                        <span>Hệ thống ổn định</span>
+                        <span>{liveEvents.length > 0 ? "Phát hiện hoạt động mới" : "Chưa có vi phạm mới"}</span>
                         <ChevronRight className="h-3 w-3" />
                     </div>
                 </CardContent>
@@ -389,6 +431,28 @@ export default function TeacherDashboard() {
             </CardFooter>
         </Card>
       </main>
+
+      {/* FLOATING LIVE FEED (Anti-Cheat) */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 pointer-events-none">
+        {liveEvents.map((evt) => (
+          <div 
+            key={evt.id} 
+            className={`shadow-2xl rounded-2xl px-5 py-4 min-w-[350px] max-w-sm pointer-events-auto animate-in slide-in-from-right duration-300 flex items-start gap-4 border-l-4 ${
+              evt.type === 'warning' 
+                ? 'bg-white border-rose-500 text-slate-900 shadow-rose-100' 
+                : 'bg-white border-blue-500 text-slate-900 shadow-blue-100'
+            }`}
+          >
+            <div className={`mt-0.5 p-2 rounded-full ${evt.type === 'warning' ? 'bg-rose-50 text-rose-500' : 'bg-blue-50 text-blue-500'}`}>
+                {evt.type === 'warning' ? <AlertTriangle className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+            </div>
+            <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Cảnh báo hệ thống</p>
+                <p className="text-sm font-bold leading-tight">{evt.message}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
