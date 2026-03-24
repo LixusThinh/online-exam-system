@@ -27,20 +27,28 @@ import {
   ChevronRight,
   Clock
 } from "lucide-react";
-import { getExams, deleteExam } from "@/lib/api";
+import { getExams, deleteExam, getClasses, createClass } from "@/lib/api";
 
 export default function TeacherDashboard() {
   const router = useRouter();
   const [exams, setExams] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newClassName, setNewClassName] = useState("");
+  const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchExams = useCallback(async (token: string) => {
+  const fetchData = useCallback(async (token: string) => {
     try {
-      const data = await getExams(token);
-      setExams(Array.isArray(data) ? data : []);
+      setLoading(true);
+      const [examsData, classesData] = await Promise.all([
+        getExams(token),
+        getClasses(token)
+      ]);
+      setExams(Array.isArray(examsData) ? examsData : []);
+      setClasses(Array.isArray(classesData) ? classesData : []);
     } catch (err: any) {
-      setError("Không thể tải danh sách đề thi. Vui lòng thử lại sau.");
+      setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
@@ -51,11 +59,31 @@ export default function TeacherDashboard() {
     const tokenCookie = cookies.find((row) => row.startsWith("token="));
     if (tokenCookie) {
       const t = tokenCookie.split("=")[1];
-      fetchExams(t);
+      fetchData(t);
     } else {
       router.push("/login");
     }
-  }, [fetchExams, router]);
+  }, [fetchData, router]);
+
+  const handleCreateClass = async () => {
+    if (!newClassName.trim()) return;
+    
+    const cookies = document.cookie.split("; ");
+    const tokenCookie = cookies.find((row) => row.startsWith("token="));
+    if (!tokenCookie) return;
+    const t = tokenCookie.split("=")[1];
+
+    try {
+      setIsCreatingClass(true);
+      await createClass({ name: newClassName.trim() }, t);
+      setNewClassName("");
+      fetchData(t);
+    } catch (err: any) {
+      alert("Tạo lớp thất bại: " + err.message);
+    } finally {
+      setIsCreatingClass(false);
+    }
+  };
 
   const handleDeleteExam = async (id: number) => {
     const cookies = document.cookie.split("; ");
@@ -66,7 +94,7 @@ export default function TeacherDashboard() {
     if (window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Toàn bộ câu hỏi và kết quả cũng sẽ bị xóa vĩnh viễn!")) {
       try {
         await deleteExam(id, t);
-        fetchExams(t); // Refresh list
+        fetchData(t); // Refresh list
       } catch (err: any) {
         alert("Xóa thất bại: " + err.message);
       }
@@ -150,7 +178,7 @@ export default function TeacherDashboard() {
                     <div className="p-2 bg-emerald-50 rounded-lg group-hover:scale-110 transition-transform"><Users className="h-4 w-4 text-emerald-600" /></div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-3xl font-black text-slate-900">1</div>
+                    <div className="text-3xl font-black text-slate-900">{loading ? "..." : classes.length}</div>
                     <div className="mt-2 flex items-center text-[10px] font-bold text-emerald-600 tracking-tighter uppercase">
                         <span>Đang hoạt động</span>
                         <ChevronRight className="h-3 w-3" />
@@ -159,17 +187,90 @@ export default function TeacherDashboard() {
             </Card>
             <Card className="border-slate-200 shadow-sm bg-white hover:border-amber-200 transition-all duration-300 group">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tỷ lệ nộp bài</CardTitle>
+                    <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest">Hoạt động 24h</CardTitle>
                     <div className="p-2 bg-amber-50 rounded-lg group-hover:scale-110 transition-transform"><Award className="h-4 w-4 text-amber-600" /></div>
                 </CardHeader>
                 <CardContent>
-                    <div className="text-3xl font-black text-slate-900">45%</div>
+                    <div className="text-3xl font-black text-slate-900">Live</div>
                     <div className="mt-2 flex items-center text-[10px] font-bold text-amber-600 tracking-tighter uppercase">
-                        <span>Tầm nhìn 24h</span>
+                        <span>Hệ thống ổn định</span>
                         <ChevronRight className="h-3 w-3" />
                     </div>
                 </CardContent>
             </Card>
+        </div>
+
+        {/* CLASS MANAGEMENT SECTION */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+          <div className="xl:col-span-4">
+             <Card className="border-slate-200 shadow-xl shadow-slate-200/20 bg-white rounded-3xl overflow-hidden h-full">
+                <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100">
+                    <CardTitle className="text-xl font-bold text-slate-900">Tạo Lớp Mới</CardTitle>
+                    <CardDescription>Mã mời sẽ tự động được sinh ra.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên Lớp Học</label>
+                        <input 
+                            type="text" 
+                            placeholder="VD: Lớp 12A1 - Toán Học"
+                            value={newClassName}
+                            onChange={(e) => setNewClassName(e.target.value)}
+                            className="w-full h-12 px-4 rounded-xl border border-slate-100 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                        />
+                    </div>
+                    <Button 
+                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-100 transition-all"
+                        onClick={handleCreateClass}
+                        disabled={isCreatingClass || !newClassName.trim()}
+                    >
+                        {isCreatingClass ? "Đang tạo..." : "Xác nhận tạo lớp"}
+                    </Button>
+                </CardContent>
+             </Card>
+          </div>
+
+          <div className="xl:col-span-8">
+             <Card className="border-slate-200 shadow-xl shadow-slate-200/20 bg-white rounded-3xl overflow-hidden">
+                <CardHeader className="bg-white p-6 border-b border-slate-100">
+                    <CardTitle className="text-xl font-bold text-slate-900">Danh Sách Lớp Học</CardTitle>
+                    <CardDescription>Cung cấp mã mời này cho học sinh để tham gia.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-slate-50/50">
+                            <TableRow className="border-slate-100 hover:bg-transparent">
+                                <TableHead className="w-[100px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">ID</TableHead>
+                                <TableHead className="font-black uppercase text-[10px] tracking-widest text-slate-400">Tên Lớp</TableHead>
+                                <TableHead className="w-[200px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">Mã Mời (Invite Code)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {classes.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="h-32 text-center text-slate-400 font-medium italic">Chưa có lớp học nào được tạo.</TableCell>
+                                </TableRow>
+                            ) : (
+                                classes.map((c) => (
+                                    <TableRow key={c.id} className="border-slate-50 hover:bg-emerald-50/30 transition-colors group">
+                                        <TableCell className="text-center font-bold text-slate-300">#{c.id}</TableCell>
+                                        <TableCell className="font-bold text-slate-800">{c.name}</TableCell>
+                                        <TableCell className="text-center">
+                                            <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg border border-emerald-100 font-mono font-black text-sm group-hover:bg-emerald-600 group-hover:text-white transition-all cursor-copy" onClick={() => {
+                                                navigator.clipboard.writeText(c.invite_code);
+                                                alert("Đã copy mã mời: " + c.invite_code);
+                                            }}>
+                                                {c.invite_code}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+             </Card>
+          </div>
         </div>
 
         {/* LIST SECTION */}
