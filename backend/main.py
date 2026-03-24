@@ -11,12 +11,8 @@ import uuid
 import models
 import schemas
 import auth
-from database import get_db, init_db
-from dependencies import get_current_user, require_role
-from models import UserRole
-
-# 1. Khởi tạo DB trước khi App chạy
-init_db()
+from database import get_db
+from dependencies import get_current_user, require_permissions
 
 # 2. Khai báo App
 app = FastAPI(
@@ -24,6 +20,9 @@ app = FastAPI(
     description="Backend API cho con Azota Clone",
     version="1.0.0"
 )
+
+from routers import websockets
+app.include_router(websockets.router)
 
 # 3. Setup CORS
 app.add_middleware(
@@ -57,7 +56,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         username=user.username,
         hashed_password=hashed_password,
         full_name=user.full_name,
-        role=user.role
+        role=user.role,
+        permissions=auth.ROLE_PERMISSIONS.get(user.role, [])
     )
     db.add(db_user)
     db.commit()
@@ -76,7 +76,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     
     # Generate token
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=auth.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
         data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
     )
@@ -89,6 +89,80 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # -----------------
 # Protected Endpoints Examples
 # -----------------
+from dependencies import oauth2_scheme
+from datetime import datetime, timezone
+from redis_mgr import redis_mgr
+
+@app.post("/logout")
+def logout(token: str = Depends(oauth2_scheme)):
+    """
+    Log out user by blacklisting their JWT token.
+    """
+    try:
+        # Decode without verifying expiration to get TTL. If it's already expired, jwt.decode with verify_exp=True would fail,
+        # but here we just want the JTI to blacklist it properly. Wait, it's safer to just let it decode normally if valid.
+        payload = auth.jwt.decode(token, auth.settings.SECRET_KEY, algorithms=[auth.settings.ALGORITHM])
+        jti = payload.get("jti")
+        exp = payload.get("exp")
+        
+        if jti and exp:
+            now = datetime.now(timezone.utc).timestamp()
+            expires_in = max(int(exp - now), 1)
+            redis_mgr.blacklist_token(jti, timedelta(seconds=expires_in))
+            
+    except auth.JWTError:
+        pass
+        
+    return {"status": "success", "message": "Đăng xuất thành công. Token đã bị ném vào danh sách đen!"}
+
+# -----------------
+# User Management (Admin Only)
+# -----------------
+@app.get("/users", response_model=List[schemas.UserResponse])
+def get_all_users(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    Get all users (Admin only)
+    """
+    # Quick static role check for admin since we just need simple access
+    if "admin" not in auth.get_permissions(current_user):
+        raise HTTPException(status_code=403, detail="Xinh xít! Chỉ Lão đại Admin mới được xem danh sách này!")
+    return db.query(models.User).all()
+
+@app.delete("/users/{user_id}", status_code=204)
+def delete_user_admin(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if "admin" not in auth.get_permissions(current_user):
+        raise HTTPException(status_code=403, detail="Chỉ Admin mới có quyền sát sinh!")
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cant delete yourself!")
+    db.delete(user)
+    db.commit()
+    return None
+
+@app.delete("/classes/{class_id}", status_code=204)
+def delete_class_admin(
+    class_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    if "admin" not in auth.get_permissions(current_user):
+        raise HTTPException(status_code=403, detail="Chỉ Admin mới có thể xóa lớp học!")
+    db_class = db.query(models.Class).filter(models.Class.id == class_id).first()
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Class not found")
+    db.delete(db_class)
+    db.commit()
+    return None
+
 @app.get("/users/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     """
@@ -106,7 +180,7 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
 def create_exam(
     exam: schemas.QuizCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["exam:create"]))
 ):
     """
     Chỉ ADMIN hoặc TEACHER được tạo đề thi. teacher_id lấy từ current_user.
@@ -131,9 +205,9 @@ def get_exams(db: Session = Depends(get_db), current_user: models.User = Depends
     - TEACHER: Chỉ thấy đề thi do mình tạo.
     - STUDENT: Chỉ thấy đề thi thuộc các lớp mình đã tham gia (qua bảng enrollments).
     """
-    if current_user.role == UserRole.ADMIN:
+    if current_user.role == "admin":
         return db.query(models.Quiz).all()
-    elif current_user.role == UserRole.TEACHER:
+    elif current_user.role == "teacher":
         return db.query(models.Quiz).filter(models.Quiz.teacher_id == current_user.id).all()
     else:
         # Lấy danh sách class_id mà sinh viên này đã enroll
@@ -164,7 +238,7 @@ def get_exam(
     if exam.password:
         # Nếu là ADMIN hoặc chủ đề thi thì có thể bypass password (tùy Lão đại, nhưng e viết chặt tròng luôn)
         # Nếu muốn chặt chẽ: password check bắt buộc
-        if current_user.role == UserRole.STUDENT and password != exam.password:
+        if current_user.role == "student" and password != exam.password:
             raise HTTPException(status_code=403, detail="Mật khẩu đề thi không đúng")
             
     return exam
@@ -174,7 +248,7 @@ def update_exam(
     exam_id: int,
     exam_update: schemas.QuizUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["exam:update"]))
 ):
     """
     Sửa đề thi. Yêu cầu quyền sở hữu hoặc ADMIN.
@@ -183,7 +257,7 @@ def update_exam(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
         
-    if current_user.role != UserRole.ADMIN and exam.teacher_id != current_user.id:
+    if current_user.role != "admin" and exam.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Không có quyền sửa đề thi của người khác")
         
     update_data = exam_update.model_dump(exclude_unset=True) # Dùng dictionary cho Pydantic v2
@@ -198,7 +272,7 @@ def update_exam(
 def delete_exam(
     exam_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["exam:delete"]))
 ):
     """
     Xóa đề thi. Yêu cầu quyền sở hữu hoặc ADMIN.
@@ -207,7 +281,7 @@ def delete_exam(
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found")
         
-    if current_user.role != UserRole.ADMIN and exam.teacher_id != current_user.id:
+    if current_user.role != "admin" and exam.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Không có quyền xóa đề thi của người khác")
         
     db.delete(exam)
@@ -222,7 +296,7 @@ def delete_exam(
 def join_class(
     invite_code: str,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.STUDENT]))
+    current_user: models.User = Depends(require_permissions(["class:join"]))
 ):
     """
     Sinh viên dùng invite_code để tham gia lớp học.
@@ -257,7 +331,7 @@ def submit_exam(
     exam_id: int,
     payload: schemas.SubmitExamRequest,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.STUDENT]))
+    current_user: models.User = Depends(require_permissions(["submission:create"]))
 ):
     """
     Sinh viên nộp bài và nhận điểm ngay lập tức.
@@ -358,7 +432,7 @@ def submit_exam(
 def create_class(
     class_data: schemas.ClassCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["class:create"]))
 ):
     """
     Tạo lớp học mới. Chỉ TEACHER/ADMIN được tạo.
@@ -392,9 +466,9 @@ def get_classes(
     - TEACHER: Chỉ thấy lớp do mình tạo.
     - STUDENT: Chỉ thấy các lớp mình đã tham gia (qua bảng enrollments).
     """
-    if current_user.role == UserRole.ADMIN:
+    if current_user.role == "admin":
         return db.query(models.Class).all()
-    elif current_user.role == UserRole.TEACHER:
+    elif current_user.role == "teacher":
         return db.query(models.Class).filter(models.Class.teacher_id == current_user.id).all()
     else:
         return current_user.enrolled_classes
@@ -408,7 +482,7 @@ def add_questions(
     exam_id: int,
     questions: List[schemas.QuestionCreate],
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["question:manage"]))
 ):
     """
     Thêm batch câu hỏi kèm đáp án vào đề thi.
@@ -421,7 +495,7 @@ def add_questions(
         raise HTTPException(status_code=404, detail="Đề thi không tồn tại")
 
     # Check quyền sở hữu (trừ ADMIN thì bypass)
-    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+    if current_user.role != "admin" and quiz.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Bạn không có quyền thêm câu hỏi vào đề thi này")
 
     created_questions = []
@@ -457,7 +531,7 @@ def add_questions(
 def get_questions_for_teacher(
     exam_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["question:manage"]))
 ):
     """
     Giáo viên lấy danh sách câu hỏi CÓ KÈM ĐÁP ÁN ĐÚNG.
@@ -466,7 +540,7 @@ def get_questions_for_teacher(
     if not quiz:
         raise HTTPException(status_code=404, detail="Đề thi không tồn tại")
     
-    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+    if current_user.role != "admin" and quiz.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Không có quyền xem đáp án đề thi này")
         
     questions = db.query(models.Question).filter(models.Question.quiz_id == exam_id).all()
@@ -477,7 +551,7 @@ def update_question(
     question_id: int,
     question_update: schemas.QuestionUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["question:manage"]))
 ):
     """
     Giáo viên sửa câu hỏi và đáp án.
@@ -487,7 +561,7 @@ def update_question(
         raise HTTPException(status_code=404, detail="Câu hỏi không tồn tại")
         
     quiz = db.query(models.Quiz).filter(models.Quiz.id == question.quiz_id).first()
-    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+    if current_user.role != "admin" and quiz.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Không có quyền sửa câu hỏi của đề thi khác")
         
     # Cập nhật nội dung câu hỏi
@@ -521,7 +595,7 @@ def update_question(
 def delete_question(
     question_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["question:manage"]))
 ):
     """
     Giáo viên xóa câu hỏi khỏi đề thi.
@@ -531,7 +605,7 @@ def delete_question(
         raise HTTPException(status_code=404, detail="Câu hỏi không tồn tại")
         
     quiz = db.query(models.Quiz).filter(models.Quiz.id == question.quiz_id).first()
-    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+    if current_user.role != "admin" and quiz.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Không có quyền xóa câu hỏi của người khác")
         
     db.delete(question)
@@ -545,7 +619,7 @@ def delete_question(
 @app.get("/submissions/me", response_model=List[schemas.SubmissionResponse])
 def get_my_submissions(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.STUDENT]))
+    current_user: models.User = Depends(require_permissions(["submission:read_own"]))
 ):
     """
     Student xem lịch sử các bài đã nộp và điểm số của mình.
@@ -559,7 +633,7 @@ def get_my_submissions(
 def get_exam_submissions(
     exam_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_role([UserRole.TEACHER, UserRole.ADMIN]))
+    current_user: models.User = Depends(require_permissions(["submission:read"]))
 ):
     """
     Teacher/Admin xem danh sách điểm của tất cả học sinh đã nộp bài cho đề thi này.
@@ -570,7 +644,7 @@ def get_exam_submissions(
     if not quiz:
         raise HTTPException(status_code=404, detail="Đề thi không tồn tại")
 
-    if current_user.role != UserRole.ADMIN and quiz.teacher_id != current_user.id:
+    if current_user.role != "admin" and quiz.teacher_id != current_user.id:
         raise HTTPException(status_code=403, detail="Bạn không có quyền xem kết quả đề thi này")
 
     submissions = db.query(models.Submission).filter(
