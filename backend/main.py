@@ -76,7 +76,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         )
     
     # Generate token
-    access_token_expires = timedelta(minutes=auth.settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # Sử dụng 1440 phút (24 tiếng) như Lão đại yêu cầu
+    access_token_expires = timedelta(minutes=1440)
     access_token = auth.create_access_token(
         data={"sub": user.username, "role": user.role}, expires_delta=access_token_expires
     )
@@ -89,79 +90,18 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # -----------------
 # Protected Endpoints Examples
 # -----------------
-from dependencies import oauth2_scheme
-from datetime import datetime, timezone
-from redis_mgr import redis_mgr
-
-@app.post("/logout")
-def logout(token: str = Depends(oauth2_scheme)):
-    """
-    Log out user by blacklisting their JWT token.
-    """
-    try:
-        # Decode without verifying expiration to get TTL. If it's already expired, jwt.decode with verify_exp=True would fail,
-        # but here we just want the JTI to blacklist it properly. Wait, it's safer to just let it decode normally if valid.
-        payload = auth.jwt.decode(token, auth.settings.SECRET_KEY, algorithms=[auth.settings.ALGORITHM])
-        jti = payload.get("jti")
-        exp = payload.get("exp")
-        
-        if jti and exp:
-            now = datetime.now(timezone.utc).timestamp()
-            expires_in = max(int(exp - now), 1)
-            redis_mgr.blacklist_token(jti, timedelta(seconds=expires_in))
-            
-    except auth.JWTError:
-        pass
-        
-    return {"status": "success", "message": "Đăng xuất thành công. Token đã bị ném vào danh sách đen!"}
-
-# -----------------
-# User Management (Admin Only)
-# -----------------
 @app.get("/users", response_model=List[schemas.UserResponse])
-def get_all_users(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
+def get_all_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
-    Get all users (Admin only)
+    ADMIN ONLY: Lấy danh sách toàn bộ người dùng trong hệ thống.
     """
-    # Quick static role check for admin since we just need simple access
-    if "admin" not in auth.get_permissions(current_user):
-        raise HTTPException(status_code=403, detail="Xinh xít! Chỉ Lão đại Admin mới được xem danh sách này!")
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền truy cập dữ liệu tối mật này!"
+        )
     return db.query(models.User).all()
 
-@app.delete("/users/{user_id}", status_code=204)
-def delete_user_admin(
-    user_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    if "admin" not in auth.get_permissions(current_user):
-        raise HTTPException(status_code=403, detail="Chỉ Admin mới có quyền sát sinh!")
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cant delete yourself!")
-    db.delete(user)
-    db.commit()
-    return None
-
-@app.delete("/classes/{class_id}", status_code=204)
-def delete_class_admin(
-    class_id: int,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    if "admin" not in auth.get_permissions(current_user):
-        raise HTTPException(status_code=403, detail="Chỉ Admin mới có thể xóa lớp học!")
-    db_class = db.query(models.Class).filter(models.Class.id == class_id).first()
-    if not db_class:
-        raise HTTPException(status_code=404, detail="Class not found")
-    db.delete(db_class)
-    db.commit()
-    return None
 
 @app.get("/users/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
