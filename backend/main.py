@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -16,8 +16,8 @@ from dependencies import get_current_user, require_permissions
 
 # 2. Khai báo App
 app = FastAPI(
-    title="Online Exam System API",
-    description="Backend API cho con Azota Clone",
+    title="SKY-EXAM API",
+    description="Hệ thống quản lý thi trực tuyến thế hệ mới - SKY-EXAM",
     version="1.0.0"
 )
 
@@ -27,7 +27,7 @@ app.include_router(websockets.router)
 # 3. Setup CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"], 
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,21 +35,17 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "success", "message": "Welcome to the Online Exam System API"}
+    return {"status": "success", "message": "Welcome to the SKY-EXAM API"}
 
 @app.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # 1. Chỉ check DUY NHẤT username (vì DB làm đéo có cột email)
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Username đã tồn tại, đéo cho tạo!")
+        raise HTTPException(status_code=400, detail="Username đã tồn tại, không cho tạo!")
         
-    # 2. Đoạn này là code tạo user và hash password của mày (giữ nguyên, tao viết tượng trưng)
-    # new_user = models.User(username=user.username, ...)
-    # db.add(new_user)
-    # db.commit()
-    # return new_user
     
+
     # Create user
     hashed_password = auth.get_password_hash(user.password)
     db_user = models.User(
@@ -150,15 +146,8 @@ def get_exams(db: Session = Depends(get_db), current_user: models.User = Depends
     elif current_user.role == "teacher":
         return db.query(models.Quiz).filter(models.Quiz.teacher_id == current_user.id).all()
     else:
-        # Lấy danh sách class_id mà sinh viên này đã enroll
-        enrolled_class_ids = [
-            c.id for c in current_user.enrolled_classes
-        ]
-        if not enrolled_class_ids:
-            return []
-        return db.query(models.Quiz).filter(
-            models.Quiz.class_id.in_(enrolled_class_ids)
-        ).all()
+        # STUDENT: Chỉ lấy đề thi PUBLIC (class_id == None)
+        return db.query(models.Quiz).filter(models.Quiz.class_id == None).all()
 
 @app.get("/exams/{exam_id}", response_model=schemas.QuizResponse)
 def get_exam(
@@ -240,7 +229,7 @@ def join_class(
 ):
     """
     Sinh viên dùng invite_code để tham gia lớp học.
-    - Chỉ STUDENT mới được gọi endpoint này.
+    - Chỉ STUDENT mới được gọi endpoint này (đã dùng Depends(require_role)).
     - Check trùng lặp: nếu đã join rồi thì báo lỗi.
     """
     # Tìm lớp theo invite_code
@@ -345,13 +334,17 @@ def submit_exam(
         submission.score = score
         submission.status = models.SubmissionStatus.SUBMITTED
         submission.finished_at = func.now()
+        # Nếu FE gửi cheat_count lên thì cập nhật, nếu không thì giữ nguyên (hoặc cộng thêm)
+        if payload.cheat_count > 0:
+            submission.cheat_count = payload.cheat_count
     else:
         submission = models.Submission(
             student_id=current_user.id,
             quiz_id=exam_id,
             score=score,
             status=models.SubmissionStatus.SUBMITTED,
-            finished_at=func.now()
+            finished_at=func.now(),
+            cheat_count=payload.cheat_count
         )
         db.add(submission)
 
@@ -361,7 +354,8 @@ def submit_exam(
         "score": score,
         "total_points": total_points,
         "status": "SUBMITTED",
-        "message": f"Nộp bài thành công! Điểm: {score}/{total_points}"
+        "message": f"Nộp bài thành công! Điểm: {score}/{total_points}",
+        "cheat_count": submission.cheat_count
     }
 
 # -----------------
@@ -412,6 +406,31 @@ def get_classes(
         return db.query(models.Class).filter(models.Class.teacher_id == current_user.id).all()
     else:
         return current_user.enrolled_classes
+
+@app.get("/classes/{class_id}/exams", response_model=List[schemas.QuizResponse])
+def get_class_exams(
+    class_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Lấy danh sách đề thi của một lớp học cụ thể.
+    - STUDENT: Phải tham gia lớp mới được lấy.
+    - TEACHER: Phải là giáo viên tạo lớp này.
+    """
+    class_obj = db.query(models.Class).filter(models.Class.id == class_id).first()
+    if not class_obj:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+
+    if current_user.role == UserRole.STUDENT:
+        if current_user not in class_obj.students:
+            raise HTTPException(status_code=403, detail="Bạn chưa tham gia lớp học này")
+    elif current_user.role == UserRole.TEACHER:
+        if class_obj.teacher_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Không có quyền xem lớp của người khác")
+
+    exams = db.query(models.Quiz).filter(models.Quiz.class_id == class_id).all()
+    return exams
 
 # -----------------
 # Question Management Endpoints
@@ -591,3 +610,54 @@ def get_exam_submissions(
         models.Submission.quiz_id == exam_id
     ).order_by(models.Submission.finished_at.desc()).all()
     return submissions
+
+# -----------------
+# WebSocket Anti-Cheat
+# -----------------
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/anti-cheat/{exam_id}/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, exam_id: int, user_id: int):
+    db: Session = next(get_db())
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            if data == "cheat_detected":
+                # Tìm hoặc tạo submission IN_PROGRESS để tăng cheat_count
+                submission = db.query(models.Submission).filter(
+                    models.Submission.student_id == user_id,
+                    models.Submission.quiz_id == exam_id,
+                    models.Submission.status == models.SubmissionStatus.IN_PROGRESS
+                ).first()
+                
+                if not submission:
+                    submission = models.Submission(
+                        student_id=user_id,
+                        quiz_id=exam_id,
+                        status=models.SubmissionStatus.IN_PROGRESS
+                    )
+                    db.add(submission)
+                
+                submission.cheat_count += 1
+                db.commit()
+                await websocket.send_text(f"Warning: Cheat detected! Total: {submission.cheat_count}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    finally:
+        db.close()

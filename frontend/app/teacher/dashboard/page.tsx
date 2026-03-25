@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Table, 
@@ -12,21 +12,43 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { PlusCircle, FileText, Settings, Loader2, Eye, Trash2, Clock, HelpCircle, BookOpen } from "lucide-react";
-import { getExams, deleteExam } from "@/lib/api";
+import { 
+  PlusCircle, 
+  FileText, 
+  Settings, 
+  Loader2, 
+  Eye, 
+  Trash2, 
+  LayoutDashboard, 
+  LogOut, 
+  GraduationCap,
+  Users,
+  Award,
+  ChevronRight,
+  Clock
+} from "lucide-react";
+import { getExams, deleteExam, getClasses, createClass } from "@/lib/api";
 
 export default function TeacherDashboard() {
   const router = useRouter();
   const [exams, setExams] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newClassName, setNewClassName] = useState("");
+  const [isCreatingClass, setIsCreatingClass] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchExams = useCallback(async (token: string) => {
+  const fetchData = useCallback(async (token: string) => {
     try {
-      const data = await getExams(token);
-      setExams(Array.isArray(data) ? data : []);
+      setLoading(true);
+      const [examsData, classesData] = await Promise.all([
+        getExams(token),
+        getClasses(token)
+      ]);
+      setExams(Array.isArray(examsData) ? examsData : []);
+      setClasses(Array.isArray(classesData) ? classesData : []);
     } catch (err: any) {
-      setError("Không thể tải danh sách đề thi. Vui lòng thử lại sau.");
+      setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
@@ -37,11 +59,31 @@ export default function TeacherDashboard() {
     const tokenCookie = cookies.find((row) => row.startsWith("token="));
     if (tokenCookie) {
       const t = tokenCookie.split("=")[1];
-      fetchExams(t);
+      fetchData(t);
     } else {
       router.push("/login");
     }
-  }, [fetchExams, router]);
+  }, [fetchData, router]);
+
+  const handleCreateClass = async () => {
+    if (!newClassName.trim()) return;
+    
+    const cookies = document.cookie.split("; ");
+    const tokenCookie = cookies.find((row) => row.startsWith("token="));
+    if (!tokenCookie) return;
+    const t = tokenCookie.split("=")[1];
+
+    try {
+      setIsCreatingClass(true);
+      await createClass({ name: newClassName.trim() }, t);
+      setNewClassName("");
+      fetchData(t);
+    } catch (err: any) {
+      alert("Tạo lớp thất bại: " + err.message);
+    } finally {
+      setIsCreatingClass(false);
+    }
+  };
 
   const handleDeleteExam = async (id: number) => {
     const cookies = document.cookie.split("; ");
@@ -52,216 +94,299 @@ export default function TeacherDashboard() {
     if (window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Toàn bộ câu hỏi và kết quả cũng sẽ bị xóa vĩnh viễn!")) {
       try {
         await deleteExam(id, t);
-        fetchExams(t); // Refresh list
+        fetchData(t); // Refresh list
       } catch (err: any) {
         alert("Xóa thất bại: " + err.message);
       }
     }
   };
 
+  const logout = () => {
+    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+    router.push("/login");
+  };
+
   return (
-    <div className="flex flex-col min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-teal-50/50 via-white to-white dark:from-teal-950/30 dark:via-zinc-950 dark:to-zinc-950 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 font-sans">
       
-      {/* HEADER NAVBAR (Sticky Glass) */}
-      <header className="sticky top-0 z-50 w-full border-b border-teal-100/50 dark:border-teal-900/50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto flex h-16 items-center px-6 md:px-10 justify-between">
+      {/* PROFESSIONAL NAVBAR */}
+      <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/70 backdrop-blur-xl">
+        <div className="mx-auto max-w-7xl flex h-16 items-center px-4 sm:px-6 lg:px-8 justify-between">
           <div className="flex items-center gap-2">
-            <div className="bg-teal-600 p-1.5 rounded-lg text-white shadow-sm">
-              <BookOpen className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 shadow-lg shadow-blue-200">
+              <GraduationCap className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-lg tracking-tight text-slate-800 dark:text-slate-200">Azota<span className="text-teal-600">Pro</span></span>
+            <span className="text-xl font-bold tracking-tight text-slate-900 border-r border-slate-200 pr-4 mr-4 hidden sm:block">
+              SKY<span className="text-blue-600">-EXAM</span>
+            </span>
+            <div className="flex items-center gap-1 text-slate-500 text-sm font-medium">
+              <LayoutDashboard className="h-4 w-4" />
+              <span>Bảng Điều Khiển Giáo Viên</span>
+            </div>
           </div>
+          
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-slate-500">Giáo viên</span>
-            <div className="h-8 w-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-sm border border-teal-200">
-              T
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1 max-w-6xl mx-auto w-full p-6 md:p-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        
-        {/* KHU VỰC CÔNG CỤ (QUICK ACTIONS) */}
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-800 to-teal-500 dark:from-teal-400 dark:to-teal-200 mb-1">
-                Bảng điều khiển
-              </h1>
-              <p className="text-slate-500 dark:text-slate-400">Quản lý kho đề thi và kết quả học tập của sinh viên.</p>
-            </div>
-            <Button 
-              size="lg" 
-              className="h-11 px-6 bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:-translate-y-0.5 transition-all duration-300 rounded-full font-semibold"
-              onClick={() => router.push("/teacher/exams/create")}
-            >
-              <PlusCircle className="mr-2 h-5 w-5" />
-              Tạo Đề Thi Mới
+            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-rose-600 transition-colors" onClick={logout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Đăng xuất
             </Button>
+            <div className="h-8 w-8 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700 font-bold text-xs ring-2 ring-white">
+              G
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-10">
+        
+        {/* HEADER SECTION */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-black tracking-tight text-slate-900">
+                Quản Lý <span className="text-blue-600">Đề Thi</span>
+            </h1>
+            <p className="text-slate-500 font-medium tracking-tight">Cổng thông tin dành cho giáo viên điều hành bài kiểm tra.</p>
+          </div>
+          <Button 
+            size="lg" 
+            className="h-12 px-8 shadow-xl shadow-blue-100 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all hover:scale-[1.02]"
+            onClick={() => router.push("/teacher/exams/create")}
+          >
+            <PlusCircle className="mr-2 h-5 w-5" />
+            Tạo Đề Thi Mới
+          </Button>
+        </div>
+
+        {/* STATS SECTION */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="border-slate-200 shadow-sm bg-white hover:border-blue-200 transition-all duration-300 group">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest">Tổng số Đề Thi</CardTitle>
+                    <div className="p-2 bg-blue-50 rounded-lg group-hover:scale-110 transition-transform"><FileText className="h-4 w-4 text-blue-600" /></div>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-black text-slate-900">{loading ? "..." : exams.length}</div>
+                    <div className="mt-2 flex items-center text-[10px] font-bold text-blue-600 tracking-tighter uppercase">
+                        <span>Lưu trữ hệ thống</span>
+                        <ChevronRight className="h-3 w-3" />
+                    </div>
+                </CardContent>
+            </Card>
+            <Card className="border-slate-200 shadow-sm bg-white hover:border-emerald-200 transition-all duration-300 group">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest">Lớp Học Đang Quản Lý</CardTitle>
+                    <div className="p-2 bg-emerald-50 rounded-lg group-hover:scale-110 transition-transform"><Users className="h-4 w-4 text-emerald-600" /></div>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-black text-slate-900">{loading ? "..." : classes.length}</div>
+                    <div className="mt-2 flex items-center text-[10px] font-bold text-emerald-600 tracking-tighter uppercase">
+                        <span>Đang hoạt động</span>
+                        <ChevronRight className="h-3 w-3" />
+                    </div>
+                </CardContent>
+            </Card>
+            <Card className="border-slate-200 shadow-sm bg-white hover:border-amber-200 transition-all duration-300 group">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                    <CardTitle className="text-xs font-bold text-slate-400 uppercase tracking-widest">Hoạt động 24h</CardTitle>
+                    <div className="p-2 bg-amber-50 rounded-lg group-hover:scale-110 transition-transform"><Award className="h-4 w-4 text-amber-600" /></div>
+                </CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-black text-slate-900">Live</div>
+                    <div className="mt-2 flex items-center text-[10px] font-bold text-amber-600 tracking-tighter uppercase">
+                        <span>Hệ thống ổn định</span>
+                        <ChevronRight className="h-3 w-3" />
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+
+        {/* CLASS MANAGEMENT SECTION */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+          <div className="xl:col-span-4">
+             <Card className="border-slate-200 shadow-xl shadow-slate-200/20 bg-white rounded-3xl overflow-hidden h-full">
+                <CardHeader className="bg-slate-50/50 p-6 border-b border-slate-100">
+                    <CardTitle className="text-xl font-bold text-slate-900">Tạo Lớp Mới</CardTitle>
+                    <CardDescription>Mã mời sẽ tự động được sinh ra.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tên Lớp Học</label>
+                        <input 
+                            type="text" 
+                            placeholder="VD: Lớp 12A1 - Toán Học"
+                            value={newClassName}
+                            onChange={(e) => setNewClassName(e.target.value)}
+                            className="w-full h-12 px-4 rounded-xl border border-slate-100 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                        />
+                    </div>
+                    <Button 
+                        className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-100 transition-all"
+                        onClick={handleCreateClass}
+                        disabled={isCreatingClass || !newClassName.trim()}
+                    >
+                        {isCreatingClass ? "Đang tạo..." : "Xác nhận tạo lớp"}
+                    </Button>
+                </CardContent>
+             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-teal-100/60 dark:border-teal-900/50 shadow-sm hover:shadow-md hover:border-teal-200 dark:hover:border-teal-800 transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Kho Đề Thi</CardTitle>
-                <div className="p-2 bg-teal-100/50 dark:bg-teal-900/40 rounded-lg text-teal-600 dark:text-teal-400">
-                  <FileText className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold font-mono text-slate-800 dark:text-slate-100">{loading ? "-" : exams.length}</div>
-                <p className="text-xs text-slate-500 mt-1">Đề thi đang hoạt động</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-teal-100/60 dark:border-teal-900/50 shadow-sm hover:shadow-md hover:border-teal-200 dark:hover:border-teal-800 transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Lớp Học</CardTitle>
-                <div className="p-2 bg-emerald-100/50 dark:bg-emerald-900/40 rounded-lg text-emerald-600 dark:text-emerald-400">
-                  <BookOpen className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold font-mono text-slate-800 dark:text-slate-100">1</div>
-                <p className="text-xs text-slate-500 mt-1">Sĩ số: 45 học sinh</p>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-teal-100/60 dark:border-teal-900/50 shadow-sm hover:shadow-md hover:border-teal-200 dark:hover:border-teal-800 transition-all duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Lượt Nộp Bài</CardTitle>
-                <div className="p-2 bg-blue-100/50 dark:bg-blue-900/40 rounded-lg text-blue-600 dark:text-blue-400">
-                  <Settings className="h-4 w-4" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold font-mono text-slate-800 dark:text-slate-100">--</div>
-                <p className="text-xs text-slate-500 mt-1">Hệ thống đang tổng hợp</p>
-              </CardContent>
-            </Card>
+          <div className="xl:col-span-8">
+             <Card className="border-slate-200 shadow-xl shadow-slate-200/20 bg-white rounded-3xl overflow-hidden">
+                <CardHeader className="bg-white p-6 border-b border-slate-100">
+                    <CardTitle className="text-xl font-bold text-slate-900">Danh Sách Lớp Học</CardTitle>
+                    <CardDescription>Cung cấp mã mời này cho học sinh để tham gia.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <Table>
+                        <TableHeader className="bg-slate-50/50">
+                            <TableRow className="border-slate-100 hover:bg-transparent">
+                                <TableHead className="w-[100px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">ID</TableHead>
+                                <TableHead className="font-black uppercase text-[10px] tracking-widest text-slate-400">Tên Lớp</TableHead>
+                                <TableHead className="w-[200px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">Mã Mời (Invite Code)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {classes.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={3} className="h-32 text-center text-slate-400 font-medium italic">Chưa có lớp học nào được tạo.</TableCell>
+                                </TableRow>
+                            ) : (
+                                classes.map((c) => (
+                                    <TableRow key={c.id} className="border-slate-50 hover:bg-emerald-50/30 transition-colors group">
+                                        <TableCell className="text-center font-bold text-slate-300">#{c.id}</TableCell>
+                                        <TableCell className="font-bold text-slate-800">{c.name}</TableCell>
+                                        <TableCell className="text-center">
+                                            <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg border border-emerald-100 font-mono font-black text-sm group-hover:bg-emerald-600 group-hover:text-white transition-all cursor-copy" onClick={() => {
+                                                navigator.clipboard.writeText(c.invite_code);
+                                                alert("Đã copy mã mời: " + c.invite_code);
+                                            }}>
+                                                {c.invite_code}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+             </Card>
           </div>
         </div>
 
-        {/* KHU VỰC KHO ĐỀ THI (QUẢN LÝ DANH SÁCH) */}
-        <Card className="shadow-md shadow-teal-900/5 border-teal-100/60 dark:border-teal-900/40 overflow-hidden ring-1 ring-black/5 dark:ring-white/5">
-          <CardHeader className="bg-white dark:bg-zinc-900 border-b border-teal-50 dark:border-zinc-800/80 px-6 py-5">
-            <CardTitle className="text-lg text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              Danh sách đề thi gần đây
-            </CardTitle>
-            <CardDescription>Click vào Xem Điểm để theo dõi tiến độ của học sinh trực tiếp.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0 bg-white dark:bg-zinc-950/50">
-            {loading ? (
-              <div className="flex flex-col items-center justify-center py-24">
-                <Loader2 className="h-10 w-10 animate-spin text-teal-600 mb-4" />
-                <p className="text-teal-600/80 font-medium">Đang tải dữ liệu từ máy chủ...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-16 px-4">
-                <div className="inline-flex items-center justify-center p-3 bg-red-100 rounded-full mb-4">
-                  <Settings className="h-6 w-6 text-red-600" />
+        {/* LIST SECTION */}
+        <Card className="border-slate-200 shadow-xl shadow-slate-200/20 bg-white rounded-3xl overflow-hidden">
+            <CardHeader className="bg-white border-b border-slate-100 p-6 flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle className="text-xl font-bold text-slate-900">Danh Sách Đề Thi</CardTitle>
+                    <CardDescription>Quản lý các bài thi đã xuất bản trên hệ thống.</CardDescription>
                 </div>
-                <p className="text-red-500 font-medium">{error}</p>
-              </div>
-            ) : exams.length === 0 ? (
-              <div className="text-center py-24 px-4 border-2 border-dashed border-teal-100 dark:border-teal-900/50 m-6 rounded-2xl bg-teal-50/30 dark:bg-teal-950/20">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white dark:bg-zinc-900 shadow-sm border border-teal-100 dark:border-teal-800 mb-6">
-                  <FileText className="h-8 w-8 text-teal-400" />
-                </div>
-                <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-200">Kho đề thi trống</h3>
-                <p className="text-slate-500 mt-2 mb-8 max-w-sm mx-auto">Bạn chưa tạo bất kỳ đề thi nào. Hãy bắt đầu xây dựng ngân hàng câu hỏi của riêng bạn.</p>
-                <Button 
-                  onClick={() => router.push("/teacher/exams/create")}
-                  className="bg-teal-600 hover:bg-teal-700 text-white rounded-full px-6 shadow-md shadow-teal-600/20 hover:shadow-teal-600/40 hover:-translate-y-0.5 transition-all"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" /> Bắt đầu tạo mới
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-teal-50/50 dark:bg-zinc-900/80">
-                    <TableRow className="hover:bg-transparent border-b-teal-100 dark:border-zinc-800">
-                      <TableHead className="w-[60px] text-center font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">STT</TableHead>
-                      <TableHead className="min-w-[250px] font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Thông tin đề thi</TableHead>
-                      <TableHead className="w-[160px] text-center font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Thời lượng</TableHead>
-                      <TableHead className="w-[140px] text-center font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Câu hỏi</TableHead>
-                      <TableHead className="text-right w-[180px] pr-6 font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Thao tác</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {exams.map((exam, index) => (
-                      <TableRow key={exam.id} className="hover:bg-teal-50/40 dark:hover:bg-teal-900/20 transition-colors border-b-slate-100 dark:border-zinc-800 group">
-                        <TableCell className="text-center font-mono text-slate-400 dark:text-slate-500">
-                          {(index + 1).toString().padStart(2, '0')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">
-                            {exam.title}
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-slate-500 mt-1.5">
-                            <span className="flex items-center gap-1">
-                              <BookOpen className="w-3 h-3" />
-                              {exam.class_id ? `Lớp ${exam.class_id}` : "Dùng chung"}
-                            </span>
-                            {exam.password && (
-                              <span className="flex items-center gap-1 text-orange-600 bg-orange-50 px-1.5 rounded">
-                                <HelpCircle className="w-3 h-3" /> Có Pass
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 dark:bg-teal-900/30 px-2.5 py-1 text-xs font-semibold text-teal-700 dark:text-teal-400 ring-1 ring-inset ring-teal-600/20">
-                            <Clock className="w-3.5 h-3.5 opacity-70" />
-                            {exam.time_limit} Phút
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-center font-mono text-slate-600 dark:text-slate-300">
-                          {exam.questions?.length || 0}
-                        </TableCell>
-                        <TableCell className="text-right pr-6">
-                          <div className="flex justify-end items-center gap-2 opacity-80 group-hover:opacity-100 transition-opacity">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              title="Xem Điểm"
-                              className="text-blue-600 border-blue-200 hover:text-blue-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm transition-all"
-                              onClick={() => router.push(`/teacher/exams/${exam.id}/submissions`)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 p-8">
+                        <Loader2 className="h-10 w-10 animate-spin text-blue-600 mb-4" />
+                        <p className="text-slate-400 font-medium">Đang truy xuất dữ liệu từ đám mây...</p>
+                    </div>
+                ) : error ? (
+                    <div className="text-center py-12 text-rose-500 font-bold p-8 bg-rose-50">{error}</div>
+                ) : exams.length === 0 ? (
+                    <div className="text-center py-24 p-8">
+                        <div className="h-20 w-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <FileText className="h-10 w-10 text-slate-200" />
+                        </div>
+                        <h3 className="text-xl font-black text-slate-900 uppercase tracking-widest">Trống rỗng_</h3>
+                        <p className="text-slate-400 mt-2 mb-8 font-medium">Bắt đầu bằng việc tạo một đề thi mới ngay bây giờ.</p>
+                        <Button 
+                            className="bg-blue-600 hover:bg-blue-700 font-bold rounded-xl"
+                            onClick={() => router.push("/teacher/exams/create")}
+                        >
+                            <PlusCircle className="mr-2 h-4 w-4" /> Tạo ngay
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader className="bg-slate-50/50">
+                                <TableRow className="border-slate-100 hover:bg-transparent">
+                                    <TableHead className="w-[80px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">STT</TableHead>
+                                    <TableHead className="min-w-[300px] font-black uppercase text-[10px] tracking-widest text-slate-400">Thông tin đề thi</TableHead>
+                                    <TableHead className="w-[150px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">Thời lượng</TableHead>
+                                    <TableHead className="w-[150px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">Số lượng</TableHead>
+                                    <TableHead className="text-right w-[200px] px-6 font-black uppercase text-[10px] tracking-widest text-slate-400">Hành động</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {exams.map((exam, index) => (
+                                    <TableRow key={exam.id} className="border-slate-50 hover:bg-blue-50/30 transition-colors group">
+                                        <TableCell className="text-center font-bold text-slate-400">{index + 1}</TableCell>
+                                        <TableCell>
+                                            <div className="font-bold text-slate-800 text-base leading-tight group-hover:text-blue-600 transition-colors cursor-pointer" onClick={() => router.push(`/teacher/exams/${exam.id}/questions`)}>
+                                                {exam.title}
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-black text-slate-400 uppercase tracking-tighter">
+                                                    {exam.class_id ? `Lớp: ${exam.class_id}` : "Toàn trường"}
+                                                </span>
+                                                {exam.password && (
+                                                    <span className="text-[10px] bg-amber-50 text-amber-500 px-1.5 py-0.5 rounded font-black uppercase tracking-tighter border border-amber-100">
+                                                        Mật khẩu
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-inset ring-slate-200">
+                                                <Clock className="h-3 w-3" />
+                                                {exam.time_limit} Phút
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-center font-bold text-slate-500">
+                                            {exam.questions?.length || 0} câu hỏi
+                                        </TableCell>
+                                        <TableCell className="text-right px-6">
+                                            <div className="flex justify-end items-center gap-2">
+                                                <Button 
+                                                    variant="secondary" 
+                                                    size="sm"
+                                                    title="Xem kết quả thi"
+                                                    className="h-9 px-3 gap-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border-none shadow-none rounded-lg font-bold"
+                                                    onClick={() => router.push(`/teacher/exams/${exam.id}/submissions`)}
+                                                >
+                                                    <Eye className="h-4 w-4" />
+                                                    <span className="hidden sm:inline">Xem kết quả thi</span>
+                                                </Button>
 
-                            <Button 
-                              variant="secondary" 
-                              size="sm"
-                              title="Quản lý Câu hỏi"
-                              className="bg-teal-100 hover:bg-teal-200 text-teal-800 dark:bg-teal-900 dark:hover:bg-teal-800 dark:text-teal-100 shadow-sm transition-all font-medium"
-                              onClick={() => router.push(`/teacher/exams/${exam.id}/questions`)}
-                            >
-                              <Settings className="mr-1.5 h-4 w-4" />
-                              Câu hỏi
-                            </Button>
+                                                <Button 
+                                                    variant="secondary" 
+                                                    size="sm"
+                                                    title="Quản lý câu hỏi"
+                                                    className="h-9 w-9 p-0 bg-slate-100 text-slate-600 hover:bg-slate-900 hover:text-white border-none shadow-none rounded-lg"
+                                                    onClick={() => router.push(`/teacher/exams/${exam.id}/questions`)}
+                                                >
+                                                    <Settings className="h-4 w-4" />
+                                                </Button>
 
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              title="Xóa Đề Thi"
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors"
-                              onClick={() => handleDeleteExam(exam.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="sm"
+                                                    title="Xóa Đề Thi"
+                                                    className="h-9 w-9 p-0 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"
+                                                    onClick={() => handleDeleteExam(exam.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </CardContent>
+            <CardFooter className="bg-slate-50/50 p-4 border-t border-slate-100 flex justify-center">
+                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">SKY-EXAM Giáo Viên Ecosystem • 2026</p>
+            </CardFooter>
         </Card>
       </main>
     </div>

@@ -28,6 +28,7 @@ export default function QuestionsManagementPage() {
   const [questions, setQuestions] = useState<any[]>([]);
   const [exam, setExam] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
   const fetchQuestions = useCallback(async (t: string) => {
@@ -104,6 +105,22 @@ export default function QuestionsManagementPage() {
       setError(err.message || "Thêm câu hỏi thất bại");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveQuestions = async () => {
+    if (!token) return;
+    setIsSaving(true);
+    try {
+      // Data đã được save từng câu mỗi khi Add (để sinh ra DB ID phục vụ cho việc Delete)
+      // Call createQuestions với mảng rỗng để không bị trùng lặp dữ liệu nhưng vẫn đảm bảo flow
+      const questionsData: any[] = [];
+      await createQuestions(examId, questionsData, token);
+      router.push('/teacher/dashboard');
+    } catch (err: any) {
+      alert("Quá trình lưu thất bại: " + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -318,7 +335,19 @@ export default function QuestionsManagementPage() {
             </div>
           )}
         </div>
-      </main>
+
+        {/* TOOLBAR NÚT LƯU & HOÀN TẤT */}
+        <div className="flex justify-end pt-8 pb-4">
+          <Button 
+            size="lg" 
+            onClick={handleSaveQuestions} 
+            disabled={isSaving}
+            className="h-14 px-10 text-lg font-bold bg-green-600 hover:bg-green-700 text-white shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all rounded-xl"
+          >
+            {isSaving ? "Đang lưu..." : "💾 Lưu & Hoàn tất đề thi"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

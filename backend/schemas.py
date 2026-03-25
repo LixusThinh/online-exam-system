@@ -121,12 +121,14 @@ class SubmitAnswer(BaseModel):
 
 class SubmitExamRequest(BaseModel):
     answers: List[SubmitAnswer]
+    cheat_count: int = 0
 
 class SubmitResponse(BaseModel):
     score: float
     total_points: float
     status: str
     message: str
+    cheat_count: int = 0
 
 class SubmissionResponse(BaseModel):
     id: int
@@ -136,6 +138,7 @@ class SubmissionResponse(BaseModel):
     status: str
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+    cheat_count: int = 0
 
     class Config:
         from_attributes = True

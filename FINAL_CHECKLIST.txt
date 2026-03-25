@@ -1,0 +1,33 @@
+============================================================
+           HƯỚNG DẪN DEMO HỆ THỐNG SKY-EXAM
+============================================================
+
+BƯỚC 1: QUẢN LÝ LỚP HỌC (Teacher Flow)
+- Đăng nhập tài khoản Giáo viên.
+- Tại Dashboard, nhập tên lớp mới (VD: "Lớp 12A1") -> Bấm "Xác nhận tạo lớp".
+- Tại bảng "Danh Sách Lớp Học", click vào Mã Mời (Invite Code) để Copy.
+
+BƯỚC 2: HỌC SINH THAM GIA (Student Flow)
+- Đăng nhập tài khoản Học sinh.
+- Dán Mã Mời vừa copy vào ô "Vào lớp học mới" -> Bấm "Tham gia".
+- Danh sách đề thi của lớp sẽ hiện ra. Bấm "Bắt đầu ngay" để làm bài.
+
+BƯỚC 3: SHOWCASE ANTI-CHEAT (WebSocket)
+- Trong lúc đang làm bài, hãy thử ALT+TAB hoặc chuyển sang Tab khác.
+- Hệ thống sẽ LUÔN LẬP TỨC hiện cảnh báo đỏ: "CẢNH BÁO VI PHẠM!".
+- Số lần vi phạm được đếm real-time và gửi về Server qua WebSocket.
+
+BƯỚC 4: SHOWCASE UI/UX (Pháo hoa)
+- Hoàn thành bài thi và bấm "Nộp bài".
+- Sau khi xác nhận, hệ thống sẽ bắn PHÁO HOA (Confetti) chúc mừng.
+- Màn hình kết quả hiển thị Điểm số và Tổng số lần vi phạm.
+
+BƯỚC 5: KIỂM TRA VI PHẠM (Teacher God-Eye)
+- Quay lại tài khoản Giáo viên.
+- Bấm vào icon "Con mắt" (Xem kết quả) của đề thi tương ứng.
+- Cột "Vi phạm (Cheat)" sẽ hiển thị chính xác số lần học sinh đã lấn tab.
+- Nếu có vi phạm, số sẽ hiện màu ĐỎ và nhấp nháy (Animate Pulse).
+
+============================================================
+             CHÚC LÃO ĐẠI DEMO THÀNH CÔNG! 🚀🦾
+============================================================

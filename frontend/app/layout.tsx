@@ -15,8 +15,8 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: "Online Exam System (Pro-Max)",
-  description: "Dựng bởi Thịnh, UI/UX chuẩn Analytics Dashboard",
+  title: "SKY-EXAM",
+  description: "Dựng bởi Thịnh",
 };
 
 export default function RootLayout({

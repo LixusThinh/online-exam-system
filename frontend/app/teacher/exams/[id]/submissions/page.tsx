@@ -176,13 +176,13 @@ export default function SubmissionsPage() {
             ) : (
               <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-teal-50/50 dark:bg-zinc-900/80">
-                    <TableRow className="hover:bg-transparent border-b-teal-100 dark:border-zinc-800">
-                      <TableHead className="w-[60px] text-center font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">STT</TableHead>
-                      <TableHead className="min-w-[250px] font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Tên Học Sinh</TableHead>
-                      <TableHead className="w-[200px] text-center font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Thời Gian Nộp</TableHead>
-                      <TableHead className="w-[150px] text-center font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Trạng Thái</TableHead>
-                      <TableHead className="text-right w-[150px] pr-8 font-semibold text-teal-800 dark:text-teal-400 text-xs uppercase tracking-wider">Điểm Số</TableHead>
+                  <TableHeader className="bg-slate-50 dark:bg-zinc-900/50">
+                    <TableRow>
+                      <TableHead className="w-[50px] text-center">STT</TableHead>
+                      <TableHead className="min-w-[200px]">Tên Học Sinh</TableHead>
+                      <TableHead className="w-[200px] text-center">Ngày Nộp</TableHead>
+                      <TableHead className="w-[120px] text-center font-black uppercase text-[10px] tracking-widest text-slate-400">Vi phạm (Cheat)</TableHead>
+                      <TableHead className="text-right w-[150px] font-black uppercase text-[10px] tracking-widest text-slate-400">Điểm Số</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -192,18 +192,8 @@ export default function SubmissionsPage() {
                           {(index + 1).toString().padStart(2, '0')}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-teal-100 dark:bg-teal-900/50 flex items-center justify-center text-teal-700 dark:text-teal-400 font-bold text-xs ring-1 ring-teal-200/50">
-                              {(sub.student?.full_name || sub.student?.username || "A").charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-teal-700 dark:group-hover:text-teal-400 transition-colors">
-                                {sub.student?.full_name || sub.student?.username || "Ẩn danh"}
-                              </div>
-                              <div className="text-xs font-mono text-slate-400 mt-0.5">
-                                UID: {sub.student?.id || "N/A"}
-                              </div>
-                            </div>
+                          <div className="font-semibold text-slate-900 dark:text-slate-100">
+                            {sub.student?.full_name || sub.student?.username || "Ẩn danh"}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
@@ -223,7 +213,12 @@ export default function SubmissionsPage() {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right pr-8">
+                        <TableCell className="text-center">
+                          <span className={`font-black text-lg ${sub.cheat_count > 0 ? 'text-rose-500 animate-pulse' : 'text-emerald-500'}`}>
+                            {sub.cheat_count || 0}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
                           {sub.status === "submitted" ? (
                             <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-teal-600 to-teal-500 bg-clip-text text-transparent drop-shadow-sm">
                               <span className="text-2xl font-bold font-mono">
