@@ -10,7 +10,7 @@ const quicksand = Quicksand({
 });
 
 export const metadata: Metadata = {
-  title: "Azota Clone - Hệ thống thi trắc nghiệm",
+  title: "SKY-EXAM",
   description: "Dựng bởi Thịnh",
 };
 

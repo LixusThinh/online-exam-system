@@ -8,7 +8,7 @@ export default function DashboardPage() {
       {/* Sidebar Layout */}
       <aside className="w-72 bg-slate-900 text-white flex flex-col shadow-2xl z-10">
         <div className="p-6 border-b border-slate-800/50">
-          <h2 className="text-2xl font-bold tracking-tighter text-blue-400">Azota Clone</h2>
+          <h2 className="text-2xl font-bold tracking-tighter text-blue-400">SKY-EXAM</h2>
         </div>
         <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
           <div className="px-4 py-3 bg-blue-600/10 text-blue-400 rounded-lg text-sm font-semibold shadow-inner border border-blue-500/20">

@@ -34,12 +34,13 @@ import {
   LayoutDashboard,
   Search
 } from "lucide-react";
-import { getExams, getMySubmissions, joinClass } from "@/lib/api";
+import { getExams, getMySubmissions, joinClass, getClasses } from "@/lib/api";
 
 export default function StudentDashboard() {
   const router = useRouter();
   const [exams, setExams] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteCode, setInviteCode] = useState("");
   const [joinLoading, setJoinLoading] = useState(false);
@@ -48,12 +49,14 @@ export default function StudentDashboard() {
   const fetchData = useCallback(async (token: string) => {
     try {
       setLoading(true);
-      const [examsData, submissionsData] = await Promise.all([
+      const [examsData, submissionsData, classesData] = await Promise.all([
         getExams(token),
-        getMySubmissions(token)
+        getMySubmissions(token),
+        getClasses(token)
       ]);
       setExams(Array.isArray(examsData) ? examsData : []);
       setSubmissions(Array.isArray(submissionsData) ? submissionsData : []);
+      setClasses(Array.isArray(classesData) ? classesData : []);
     } catch (err: any) {
       setError("Không thể kết nối máy chủ. Vui lòng kiểm tra lại đường truyền.");
       console.error(err);
@@ -122,7 +125,7 @@ export default function StudentDashboard() {
               <GraduationCap className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold tracking-tight text-slate-900 border-r border-slate-200 pr-4 mr-4 hidden sm:block">
-              Azota<span className="text-indigo-600">Pro</span>
+              SKY<span className="text-indigo-600">-EXAM</span>
             </span>
             <div className="flex items-center gap-1 text-slate-500 text-sm font-medium">
               <LayoutDashboard className="h-4 w-4" />
@@ -233,7 +236,7 @@ export default function StudentDashboard() {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <BookOpen className="h-6 w-6 text-indigo-600" />
-                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kỳ thi đang diễn ra</h2>
+                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kỳ thi Công Khai</h2>
                     </div>
                 </div>
 
@@ -281,6 +284,38 @@ export default function StudentDashboard() {
                                 </Card>
                             );
                         })}
+                    </div>
+                )}
+            </div>
+            
+            {/* CLASSES LIST SECTION */}
+            <div className="xl:col-span-2 space-y-6 pt-4 border-t border-slate-100 mt-8">
+                <div className="flex items-center gap-2">
+                    <GraduationCap className="h-6 w-6 text-emerald-600" />
+                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Lớp của tôi</h2>
+                </div>
+                
+                {classes.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-2xl bg-white/50 text-center">
+                        <AlertCircle className="h-12 w-12 text-slate-300 mb-4" />
+                        <h3 className="text-lg font-bold text-slate-800">Chưa tham gia lớp nào</h3>
+                        <p className="text-slate-500 max-w-xs mt-1">Gõ mã mời ở phía trên để tham gia các lớp học.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {classes.map((c: any) => (
+                            <Card key={c.id} className="group relative border-slate-200 hover:border-emerald-400 hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-300 cursor-pointer overflow-hidden rounded-2xl bg-white" onClick={() => router.push(`/student/classes/${c.id}`)}>
+                                <div className="absolute top-0 right-0 h-1.5 w-full bg-emerald-500" />
+                                <CardHeader className="pb-4 pt-6">
+                                    <Badge variant="outline" className="w-max rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border-emerald-200 text-emerald-600 bg-emerald-50 mb-3">
+                                        Lớp Học #{c.id}
+                                    </Badge>
+                                    <CardTitle className="text-xl font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-emerald-600 transition-colors">
+                                        {c.name}
+                                    </CardTitle>
+                                </CardHeader>
+                            </Card>
+                        ))}
                     </div>
                 )}
             </div>
@@ -337,7 +372,7 @@ export default function StudentDashboard() {
 
       <footer className="mx-auto max-w-7xl px-4 py-12 border-t border-slate-200 mt-12">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-sm font-medium">
-            <p>© 2026 AzotaPro Learning System.</p>
+            <p>© 2026 SKY-EXAM Learning System.</p>
             <div className="flex gap-6 uppercase tracking-widest text-[10px]">
                 <a href="#" className="hover:text-indigo-600 transition-colors">Điều khoản</a>
                 <a href="#" className="hover:text-indigo-600 transition-colors">Bảo mật</a>

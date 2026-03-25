@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { createExam } from "@/lib/api";
+import { createExam, getClasses } from "@/lib/api";
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -26,12 +26,13 @@ const formSchema = z.object({
   time_limit: z.coerce.number().min(1, {
     message: "Thời gian làm bài phải lớn hơn 0.",
   }),
-  // Optional password field if needed, but the backend allows it to be optional.
+  class_id: z.string().optional(),
 });
 
 export default function CreateExamPage() {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
+  const [classes, setClasses] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -40,17 +41,22 @@ export default function CreateExamPage() {
     const cookies = document.cookie.split("; ");
     const tokenCookie = cookies.find(row => row.startsWith("token="));
     if (tokenCookie) {
-      setToken(tokenCookie.split("=")[1]);
+      const t = tokenCookie.split("=")[1];
+      setToken(t);
+      getClasses(t).then(data => {
+        if (Array.isArray(data)) setClasses(data);
+      }).catch(console.error);
     } else {
       router.push("/login");
     }
   }, [router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any, // <--- ĐẬP CÁI "as any" VÀO ĐÂY ĐỂ NÓ CÂM MÕM!
     defaultValues: {
       title: "",
       time_limit: 45,
+      class_id: "",
     },
   });
 
@@ -65,8 +71,9 @@ export default function CreateExamPage() {
       const payload = {
         title: values.title,
         time_limit: values.time_limit,
+        class_id: values.class_id ? parseInt(values.class_id) : null,
       };
-      
+
       const newExam = await createExam(payload, token);
       // Redirect to questions management page
       router.push(`/teacher/exams/${newExam.id}/questions`);
@@ -124,10 +131,34 @@ export default function CreateExamPage() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="class_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-base font-semibold">Giao cho Lớp học (Tùy chọn)</FormLabel>
+                    <FormControl>
+                      <select 
+                        className="flex h-12 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        {...field}
+                      >
+                        <option value="">-- Tất cả học sinh (Công khai) --</option>
+                        {classes.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormDescription>
+                      Nếu chọn lớp, chỉ học sinh lớp này mới thấy đề thi.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="flex justify-end gap-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => router.push("/teacher/dashboard")}
                   className="h-12 px-6"
                 >

@@ -117,7 +117,7 @@ export default function TeacherDashboard() {
               <GraduationCap className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold tracking-tight text-slate-900 border-r border-slate-200 pr-4 mr-4 hidden sm:block">
-              Azota<span className="text-blue-600">Pro</span>
+              SKY<span className="text-blue-600">-EXAM</span>
             </span>
             <div className="flex items-center gap-1 text-slate-500 text-sm font-medium">
               <LayoutDashboard className="h-4 w-4" />
@@ -348,11 +348,12 @@ export default function TeacherDashboard() {
                                                 <Button 
                                                     variant="secondary" 
                                                     size="sm"
-                                                    title="Chấm Điểm & Nộp Bài"
-                                                    className="h-9 w-9 p-0 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border-none shadow-none rounded-lg"
+                                                    title="Xem kết quả thi"
+                                                    className="h-9 px-3 gap-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border-none shadow-none rounded-lg font-bold"
                                                     onClick={() => router.push(`/teacher/exams/${exam.id}/submissions`)}
                                                 >
                                                     <Eye className="h-4 w-4" />
+                                                    <span className="hidden sm:inline">Xem kết quả thi</span>
                                                 </Button>
 
                                                 <Button 
@@ -384,7 +385,7 @@ export default function TeacherDashboard() {
                 )}
             </CardContent>
             <CardFooter className="bg-slate-50/50 p-4 border-t border-slate-100 flex justify-center">
-                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">AzotaPro Giáo Viên Ecosystem • 2026</p>
+                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.2em]">SKY-EXAM Giáo Viên Ecosystem • 2026</p>
             </CardFooter>
         </Card>
       </main>

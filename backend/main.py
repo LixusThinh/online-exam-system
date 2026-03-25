@@ -20,15 +20,15 @@ init_db()
 
 # 2. Khai báo App
 app = FastAPI(
-    title="Online Exam System API",
-    description="Backend API cho con Azota Clone",
+    title="SKY-EXAM API",
+    description="Hệ thống quản lý thi trực tuyến thế hệ mới - SKY-EXAM",
     version="1.0.0"
 )
 
 # 3. Setup CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"], 
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,21 +36,17 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"status": "success", "message": "Welcome to the Online Exam System API"}
+    return {"status": "success", "message": "Welcome to the SKY-EXAM API"}
 
 @app.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # 1. Chỉ check DUY NHẤT username (vì DB làm đéo có cột email)
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Username đã tồn tại, đéo cho tạo!")
+        raise HTTPException(status_code=400, detail="Username đã tồn tại, không cho tạo!")
         
-    # 2. Đoạn này là code tạo user và hash password của mày (giữ nguyên, tao viết tượng trưng)
-    # new_user = models.User(username=user.username, ...)
-    # db.add(new_user)
-    # db.commit()
-    # return new_user
     
+
     # Create user
     hashed_password = auth.get_password_hash(user.password)
     db_user = models.User(
@@ -150,15 +146,8 @@ def get_exams(db: Session = Depends(get_db), current_user: models.User = Depends
     elif current_user.role == UserRole.TEACHER:
         return db.query(models.Quiz).filter(models.Quiz.teacher_id == current_user.id).all()
     else:
-        # Lấy danh sách class_id mà sinh viên này đã enroll
-        enrolled_class_ids = [
-            c.id for c in current_user.enrolled_classes
-        ]
-        if not enrolled_class_ids:
-            return []
-        return db.query(models.Quiz).filter(
-            models.Quiz.class_id.in_(enrolled_class_ids)
-        ).all()
+        # STUDENT: Chỉ lấy đề thi PUBLIC (class_id == None)
+        return db.query(models.Quiz).filter(models.Quiz.class_id == None).all()
 
 @app.get("/exams/{exam_id}", response_model=schemas.QuizResponse)
 def get_exam(
@@ -240,7 +229,7 @@ def join_class(
 ):
     """
     Sinh viên dùng invite_code để tham gia lớp học.
-    - Chỉ STUDENT mới được gọi endpoint này.
+    - Chỉ STUDENT mới được gọi endpoint này (đã dùng Depends(require_role)).
     - Check trùng lặp: nếu đã join rồi thì báo lỗi.
     """
     # Tìm lớp theo invite_code
@@ -417,6 +406,31 @@ def get_classes(
         return db.query(models.Class).filter(models.Class.teacher_id == current_user.id).all()
     else:
         return current_user.enrolled_classes
+
+@app.get("/classes/{class_id}/exams", response_model=List[schemas.QuizResponse])
+def get_class_exams(
+    class_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([UserRole.STUDENT, UserRole.TEACHER, UserRole.ADMIN]))
+):
+    """
+    Lấy danh sách đề thi của một lớp học cụ thể.
+    - STUDENT: Phải tham gia lớp mới được lấy.
+    - TEACHER: Phải là giáo viên tạo lớp này.
+    """
+    class_obj = db.query(models.Class).filter(models.Class.id == class_id).first()
+    if not class_obj:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lớp học")
+
+    if current_user.role == UserRole.STUDENT:
+        if current_user not in class_obj.students:
+            raise HTTPException(status_code=403, detail="Bạn chưa tham gia lớp học này")
+    elif current_user.role == UserRole.TEACHER:
+        if class_obj.teacher_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Không có quyền xem lớp của người khác")
+
+    exams = db.query(models.Quiz).filter(models.Quiz.class_id == class_id).all()
+    return exams
 
 # -----------------
 # Question Management Endpoints
