@@ -2,45 +2,45 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   CardDescription,
   CardFooter
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
-  Users, 
-  BookOpen, 
-  Layers, 
-  Trash2, 
-  ShieldAlert, 
-  Database, 
-  Terminal, 
-  Activity, 
+import {
+  Users,
+  BookOpen,
+  Layers,
+  Trash2,
+  ShieldAlert,
+  Database,
+  Terminal,
+  Activity,
   Search,
   LogOut,
   RefreshCw,
   Lock,
   Zap
 } from "lucide-react";
-import { 
-    getUsers, 
-    getClasses, 
-    getExams, 
-    deleteUser, 
-    deleteClass, 
-    deleteExam 
+import {
+  getUsers,
+  getClasses,
+  getExams,
+  deleteUser,
+  deleteClass,
+  deleteExam
 } from "@/lib/api";
 
 export default function AdminDashboard() {
@@ -89,7 +89,7 @@ export default function AdminDashboard() {
 
   const handleDeleteUser = async (id: number, name: string) => {
     if (!window.confirm(`XÁC NHẬN TRUY CẬP: Xóa người dùng ${name}? Hành động này không thể hoàn tác!`)) return;
-    
+
     const cookies = document.cookie.split("; ");
     const tokenCookie = cookies.find((row) => row.startsWith("token="));
     if (!tokenCookie) return;
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
 
   const handleDeleteClass = async (id: number, name: string) => {
     if (!window.confirm(`XÁC NHẬN TRUY CẬP: Xóa lớp học ${name}?`)) return;
-    
+
     const cookies = document.cookie.split("; ");
     const tokenCookie = cookies.find((row) => row.startsWith("token="));
     if (!tokenCookie) return;
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-[#00ff9f] font-mono selection:bg-[#00ff9f] selection:text-black">
-      
+
       {/* GOD MODE HEADER */}
       <header className="border-b border-[#00ff9f]/20 bg-black/80 backdrop-blur-md sticky top-0 z-50">
         <div className="mx-auto max-w-[1600px] flex h-16 items-center px-6 justify-between">
@@ -143,17 +143,17 @@ export default function AdminDashboard() {
               <span className="text-[10px] font-bold text-[#00ff9f] animate-pulse underline decoration-double">GOD MODE ENABLED</span>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-6">
             <div className="hidden lg:flex items-center gap-6 text-[10px] font-bold tracking-widest text-[#00ff9f]/40">
-                <div className="flex items-center gap-2"><Activity className="h-3 w-3" /> LATENCY: 2ms</div>
-                <div className="flex items-center gap-2"><Database className="h-3 w-3" /> BUFFER: 100%</div>
+              <div className="flex items-center gap-2"><Activity className="h-3 w-3" /> LATENCY: 2ms</div>
+              <div className="flex items-center gap-2"><Database className="h-3 w-3" /> BUFFER: 100%</div>
             </div>
-            <Button 
-                variant="outline" 
-                size="sm" 
-                className="border-[#00ff9f]/30 hover:bg-[#00ff9f] hover:text-black transition-all text-[10px] font-black tracking-widest h-8"
-                onClick={logout}
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-[#00ff9f]/30 hover:bg-[#00ff9f] hover:text-black transition-all text-[10px] font-black tracking-widest h-8"
+              onClick={logout}
             >
               <LogOut className="h-3 w-3 mr-2" />
               TERMINATE_SESSION
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
       </header>
 
       <main className="mx-auto max-w-[1600px] p-6 space-y-8">
-        
+
         {/* TOP METRICS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
@@ -172,110 +172,109 @@ export default function AdminDashboard() {
             { label: "EXAM PROTOCOLS", val: exams.length, icon: BookOpen, color: "255, 0, 255" },
             { label: "SYS HEALTH", val: "99.9%", icon: Zap, color: "255, 255, 0" },
           ].map((stat, i) => (
-             <Card key={i} className="bg-black border border-[#00ff9f]/20 shadow-[0_0_20px_rgba(0,0,0,0.5)] group hover:border-[#00ff9f]/60 transition-all overflow-hidden relative">
-                <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <stat.icon className="w-24 h-24" style={{ color: `rgb(${stat.color})` }} />
+            <Card key={i} className="bg-black border border-[#00ff9f]/20 shadow-[0_0_20px_rgba(0,0,0,0.5)] group hover:border-[#00ff9f]/60 transition-all overflow-hidden relative">
+              <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <stat.icon className="w-24 h-24" style={{ color: `rgb(${stat.color})` }} />
+              </div>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-[10px] font-black tracking-[0.3em] text-slate-400 uppercase">{stat.label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-black tracking-tighter" style={{ color: `rgb(${stat.color})` }}>
+                  {loading ? "---" : stat.val}
                 </div>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-[10px] font-black tracking-[0.3em] text-slate-400 uppercase">{stat.label}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-4xl font-black tracking-tighter" style={{ color: `rgb(${stat.color})` }}>
-                        {loading ? "---" : stat.val}
-                    </div>
-                </CardContent>
-                <div className="h-1 w-full opacity-20" style={{ background: `linear-gradient(90deg, transparent, rgb(${stat.color}), transparent)` }} />
-             </Card>
+              </CardContent>
+              <div className="h-1 w-full opacity-20" style={{ background: `linear-gradient(90deg, transparent, rgb(${stat.color}), transparent)` }} />
+            </Card>
           ))}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-          
+
           {/* USER & SYSTEM TABLES */}
           <div className="xl:col-span-8 space-y-8">
-            
+
             {/* USER MANAGEMENT */}
             <Card className="bg-black border border-[#00ff9f]/20 rounded-none overflow-hidden h-fit">
               <CardHeader className="border-b border-[#00ff9f]/10 flex flex-row items-center justify-between p-4 bg-[#00ff9f]/5">
                 <div>
-                    <CardTitle className="text-sm font-black tracking-widest flex items-center gap-2">
-                        <Users className="h-4 w-4" /> USER_DATABASE
-                    </CardTitle>
+                  <CardTitle className="text-sm font-black tracking-widest flex items-center gap-2">
+                    <Users className="h-4 w-4" /> USER_DATABASE
+                  </CardTitle>
                 </div>
                 <Button size="icon" variant="ghost" className="h-8 w-8 text-[#00ff9f]/40 hover:text-[#00ff9f]" onClick={() => fetchData(document.cookie.split("token=")[1].split(";")[0])}>
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                    <Table>
-                        <TableHeader className="bg-slate-900/50">
-                            <TableRow className="border-[#00ff9f]/20 hover:bg-transparent">
-                                <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest">ID</TableHead>
-                                <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest font-mono">USERNAME</TableHead>
-                                <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest">ROLE</TableHead>
-                                <TableHead className="text-right text-emerald-400 text-[10px] uppercase font-black tracking-widest px-6">CMD</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {users.map((user) => (
-                                <TableRow key={user.id} className="border-[#00ff9f]/10 hover:bg-[#00ff9f]/10 transition-colors group">
-                                    <TableCell className="text-slate-400 font-bold text-xs font-mono">#{user.id}</TableCell>
-                                    <TableCell className="font-bold text-sm text-white">{user.username}</TableCell>
-                                    <TableCell>
-                                        <span className={`text-[10px] px-2 py-0.5 font-black uppercase tracking-widest border border-current ${
-                                            user.role === 'admin' ? 'text-rose-500' : user.role === 'teacher' ? 'text-blue-500' : 'text-emerald-500'
-                                        }`}>
-                                            {user.role}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-right px-6">
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="h-8 w-8 text-rose-500/30 hover:text-rose-500 hover:bg-rose-500/10"
-                                            onClick={() => handleDeleteUser(user.id, user.username)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                  <Table>
+                    <TableHeader className="bg-slate-900/50">
+                      <TableRow className="border-[#00ff9f]/20 hover:bg-transparent">
+                        <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest">ID</TableHead>
+                        <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest font-mono">USERNAME</TableHead>
+                        <TableHead className="text-emerald-400 text-[10px] uppercase font-black tracking-widest">ROLE</TableHead>
+                        <TableHead className="text-right text-emerald-400 text-[10px] uppercase font-black tracking-widest px-6">CMD</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id} className="border-[#00ff9f]/10 hover:bg-[#00ff9f]/10 transition-colors group">
+                          <TableCell className="text-slate-400 font-bold text-xs font-mono">#{user.id}</TableCell>
+                          <TableCell className="font-bold text-sm text-white">{user.username}</TableCell>
+                          <TableCell>
+                            <span className={`text-[10px] px-2 py-0.5 font-black uppercase tracking-widest border border-current ${user.role === 'admin' ? 'text-rose-500' : user.role === 'teacher' ? 'text-blue-500' : 'text-emerald-500'
+                              }`}>
+                              {user.role}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-rose-500/30 hover:text-rose-500 hover:bg-rose-500/10"
+                              onClick={() => handleDeleteUser(user.id, user.username)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
 
             {/* CLASS MANAGEMENT */}
             <Card className="bg-black border border-[#00ff9f]/20 rounded-none overflow-hidden">
-               <CardHeader className="border-b border-[#00ff9f]/10 p-4 bg-[#00ff9f]/5">
-                    <CardTitle className="text-sm font-black tracking-widest flex items-center gap-2 uppercase">
-                        <Layers className="h-4 w-4" /> Class_Dissolution_Control
-                    </CardTitle>
-               </CardHeader>
-               <CardContent className="p-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[#00ff9f]/10">
-                        {classes.map(c => (
-                            <div key={c.id} className="bg-black p-4 flex items-center justify-between group hover:bg-[#00ff9f]/5 transition-colors">
-                                <div className="space-y-1">
-                                    <div className="text-sm font-black text-white">{c.name}</div>
-                                    <div className="text-[10px] font-bold text-slate-400 flex items-center gap-2 uppercase">
-                                        <Lock className="h-3 w-3 text-emerald-400" /> CODE: <span className="text-white font-mono">{c.invite_code}</span>
-                                    </div>
-                                </div>
-                                <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-8 w-8 text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/10"
-                                    onClick={() => handleDeleteClass(c.id, c.name)}
-                                >
-                                    <Trash2 className="h-3 w-3" />
-                                </Button>
-                            </div>
-                        ))}
+              <CardHeader className="border-b border-[#00ff9f]/10 p-4 bg-[#00ff9f]/5">
+                <CardTitle className="text-sm font-black tracking-widest flex items-center gap-2 uppercase">
+                  <Layers className="h-4 w-4" /> Class_Dissolution_Control
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[#00ff9f]/10">
+                  {classes.map(c => (
+                    <div key={c.id} className="bg-black p-4 flex items-center justify-between group hover:bg-[#00ff9f]/5 transition-colors">
+                      <div className="space-y-1">
+                        <div className="text-sm font-black text-white">{c.name}</div>
+                        <div className="text-[10px] font-bold text-slate-400 flex items-center gap-2 uppercase">
+                          <Lock className="h-3 w-3 text-emerald-400" /> CODE: <span className="text-white font-mono">{c.invite_code}</span>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-rose-500/40 hover:text-rose-500 hover:bg-rose-500/10"
+                        onClick={() => handleDeleteClass(c.id, c.name)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
-               </CardContent>
+                  ))}
+                </div>
+              </CardContent>
             </Card>
 
           </div>
@@ -283,27 +282,27 @@ export default function AdminDashboard() {
           {/* SIDEBAR: SYSTEM LOGS */}
           <div className="xl:col-span-4 h-full">
             <Card className="bg-black border border-[#00ff9f]/20 rounded-none h-full flex flex-col shadow-[0_0_40px_rgba(0,0,0,0.8)]">
-                <CardHeader className="border-b border-[#00ff9f]/10 p-4 shrink-0 flex flex-row items-center justify-between">
-                    <CardTitle className="text-sm font-black tracking-widest flex items-center gap-2">
-                        <Terminal className="h-4 w-4" /> SYSTEM_LOGS
-                    </CardTitle>
-                    <div className="h-2 w-2 rounded-full bg-[#00ff9f] animate-ping" />
-                </CardHeader>
-                <CardContent className="flex-1 p-4 font-mono text-[11px] overflow-y-auto space-y-2 scrollbar-hide">
-                    {logs.map((log, i) => (
-                        <div key={i} className={`flex gap-3 leading-relaxed ${log.includes("CRITICAL") ? 'text-rose-500' : 'text-green-400'}`}>
-                            <span className="opacity-60 shrink-0 text-slate-500">{logs.length - i}</span>
-                            <span className="break-all font-bold tracking-tight">{log}</span>
-                        </div>
-                    ))}
-                    {logs.length === 0 && <div className="text-green-900 animate-pulse italic">Awaiting input...</div>}
-                </CardContent>
-                <CardFooter className="border-t border-[#00ff9f]/10 p-3 bg-black flex items-center gap-2 overflow-hidden">
-                    <span className="text-[#00ff9f] animate-bounce">&gt;_</span>
-                    <div className="h-3 w-[200px] bg-[#00ff9f]/10 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[#00ff9f]/40 animate-[shimmer_2s_infinite]" />
-                    </div>
-                </CardFooter>
+              <CardHeader className="border-b border-[#00ff9f]/10 p-4 shrink-0 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-black tracking-widest flex items-center gap-2">
+                  <Terminal className="h-4 w-4" /> SYSTEM_LOGS
+                </CardTitle>
+                <div className="h-2 w-2 rounded-full bg-[#00ff9f] animate-ping" />
+              </CardHeader>
+              <CardContent className="flex-1 p-4 font-mono text-[11px] overflow-y-auto space-y-2 scrollbar-hide">
+                {logs.map((log, i) => (
+                  <div key={i} className={`flex gap-3 leading-relaxed ${log.includes("CRITICAL") ? 'text-rose-500' : 'text-green-400'}`}>
+                    <span className="opacity-60 shrink-0 text-slate-500">{logs.length - i}</span>
+                    <span className="break-all font-bold tracking-tight">{log}</span>
+                  </div>
+                ))}
+                {logs.length === 0 && <div className="text-green-900 animate-pulse italic">Awaiting input...</div>}
+              </CardContent>
+              <CardFooter className="border-t border-[#00ff9f]/10 p-3 bg-black flex items-center gap-2 overflow-hidden">
+                <span className="text-[#00ff9f] animate-bounce">&gt;_</span>
+                <div className="h-3 w-[200px] bg-[#00ff9f]/10 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[#00ff9f]/40 animate-[shimmer_2s_infinite]" />
+                </div>
+              </CardFooter>
             </Card>
           </div>
 
