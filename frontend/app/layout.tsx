@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-// 1. Import font Quicksand từ Google Fonts của Next.js
-import { Quicksand } from "next/font/google";
+import { Fira_Sans, Fira_Code } from "next/font/google";
 import "./globals.css";
 
-// 2. Cấu hình font (nhớ chọn subsets vietnamese để không bị lỗi dấu tiếng Việt)
-const quicksand = Quicksand({
-  subsets: ["vietnamese"],
+const firaSans = Fira_Sans({
+  subsets: ["vietnamese", "latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-sans",
+});
+
+const firaCode = Fira_Code({
+  subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
@@ -21,8 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      {/* 3. Áp dụng font vào thẻ body */}
-      <body className={quicksand.className}>
+      <body className={`${firaSans.variable} ${firaCode.variable} font-sans antialiased selection:bg-teal-200 selection:text-teal-900`}>
         {children}
       </body>
     </html>
