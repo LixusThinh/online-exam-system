@@ -230,11 +230,8 @@ def join_class(
 ):
     """
     Sinh viên dùng invite_code để tham gia lớp học.
-<<<<<<< ours
     - Chỉ STUDENT mới được gọi endpoint này (đã dùng Depends(require_permissions)).
-=======
-    - Chỉ STUDENT mới được gọi endpoint này (đã dùng Depends(require_role)).
->>>>>>> theirs
+
     - Check trùng lặp: nếu đã join rồi thì báo lỗi.
     """
     # Tìm lớp theo invite_code
