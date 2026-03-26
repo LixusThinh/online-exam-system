@@ -21,18 +21,18 @@ app = FastAPI(
     version="1.0.0"
 )
 
-from routers import websockets
-app.include_router(websockets.router)
-
 # 3. Setup CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
-
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from routers import websockets
+app.include_router(websockets.router)
+
 
 @app.get("/")
 def read_root():
@@ -40,7 +40,7 @@ def read_root():
 
 @app.post("/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # 1. Chỉ check DUY NHẤT username (vì DB làm đéo có cột email)
+
     db_user = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username đã tồn tại, không cho tạo!")
