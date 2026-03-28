@@ -1,5 +1,6 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from typing import Dict, List
+from jose import JWTError, jwt
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,8 @@ class ConnectionManager:
         self.teacher_connections: Dict[int, List[WebSocket]] = {}
         # We can also store student connections if we need to send them commands (e.g. force submit)
         self.student_connections: Dict[int, List[WebSocket]] = {}
+        # Global teacher monitoring connections (dashboard-level)
+        self.global_teacher_connections: List[WebSocket] = []
 
     async def connect_teacher(self, websocket: WebSocket, exam_id: int):
         await websocket.accept()
@@ -26,6 +29,15 @@ class ConnectionManager:
     def disconnect_teacher(self, websocket: WebSocket, exam_id: int):
         if exam_id in self.teacher_connections and websocket in self.teacher_connections[exam_id]:
             self.teacher_connections[exam_id].remove(websocket)
+
+    async def connect_global_teacher(self, websocket: WebSocket):
+        await websocket.accept()
+        self.global_teacher_connections.append(websocket)
+        logger.info("Teacher connected to global monitoring")
+
+    def disconnect_global_teacher(self, websocket: WebSocket):
+        if websocket in self.global_teacher_connections:
+            self.global_teacher_connections.remove(websocket)
 
     async def connect_student(self, websocket: WebSocket, exam_id: int):
         await websocket.accept()
@@ -45,6 +57,12 @@ class ConnectionManager:
                     await connection.send_json(message)
                 except Exception as e:
                     logger.error(f"Error sending WS msg to teacher: {e}")
+        # Also broadcast to global dashboard listeners
+        for connection in self.global_teacher_connections:
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error(f"Error sending WS msg to global teacher: {e}")
 
 manager = ConnectionManager()
 
@@ -58,6 +76,37 @@ async def websocket_teacher(websocket: WebSocket, exam_id: int):
             data = await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect_teacher(websocket, exam_id)
+
+@router.websocket("/anti-cheat/global")
+async def websocket_global_teacher(websocket: WebSocket, token: str = Query(default=None)):
+    """
+    Global anti-cheat monitoring for Teacher Dashboard.
+    Authenticates via ?token=<JWT> query parameter.
+    Receives broadcast events from ALL active exams.
+    """
+    # Validate JWT token
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return
+
+    try:
+        from config import settings
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        role = payload.get("role", "")
+        if role not in ("teacher", "admin"):
+            await websocket.close(code=4003, reason="Insufficient permissions")
+            return
+    except JWTError:
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
+    await manager.connect_global_teacher(websocket)
+    try:
+        while True:
+            # Keep connection alive
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect_global_teacher(websocket)
 
 @router.websocket("/exams/{exam_id}/student")
 async def websocket_student(websocket: WebSocket, exam_id: int):
@@ -75,3 +124,4 @@ async def websocket_student(websocket: WebSocket, exam_id: int):
         manager.disconnect_student(websocket, exam_id)
         # Notify teacher that student disconnected
         # await manager.broadcast_to_teachers(exam_id, {"type": "disconnect", "student_id": ...})
+

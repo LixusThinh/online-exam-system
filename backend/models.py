@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Enum, DateTime, Table, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
 from database import Base
@@ -13,6 +13,11 @@ enrollments = Table(
 )
 
 
+class UserRole(str, enum.Enum):
+    ADMIN = "admin"
+    TEACHER = "teacher"
+    STUDENT = "student"
+
 class SubmissionStatus(str, enum.Enum):
     IN_PROGRESS = "in_progress"
     SUBMITTED = "submitted"
@@ -24,7 +29,11 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String)
-    role = Column(String, default="student")
+    role: Mapped[str] = mapped_column(
+        String(20), 
+        nullable=False,
+        default="student"
+    )
     permissions = Column(JSON, default=list)
 
     # Quan hệ 1-N: Teacher sở hữu Class / Quiz

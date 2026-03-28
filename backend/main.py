@@ -9,6 +9,7 @@ import uuid
 
 # Import mấy cái "hàng nhà làm" của mày vào đây
 import models
+from models import UserRole
 import schemas
 import auth
 from database import get_db
@@ -24,7 +25,7 @@ app = FastAPI(
 # 3. Setup CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origin_regex=".*", 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -657,7 +658,7 @@ async def websocket_endpoint(websocket: WebSocket, exam_id: int, user_id: int):
                     )
                     db.add(submission)
                 
-                submission.cheat_count += 1
+                submission.cheat_count = (submission.cheat_count or 0) + 1
                 db.commit()
                 await websocket.send_text(f"Warning: Cheat detected! Total: {submission.cheat_count}")
     except WebSocketDisconnect:
