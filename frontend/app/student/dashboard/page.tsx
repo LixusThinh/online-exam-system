@@ -2,37 +2,25 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription, 
-  CardFooter 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { 
-  BookOpen, 
-  CheckCircle2, 
-  Clock, 
-  PlusCircle, 
-  GraduationCap, 
-  PlayCircle, 
-  Trophy, 
+import {
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  PlusCircle,
+  GraduationCap,
+  PlayCircle,
+  Trophy,
   AlertCircle,
   LogOut,
-  LayoutDashboard,
-  Search
+  Search,
+  TrendingUp,
+  Users,
+  Sparkles,
+  ArrowRight,
+  ChevronRight,
+  Zap,
+  CalendarDays,
+  Target,
 } from "lucide-react";
 import { getExams, getMySubmissions, joinClass, getClasses } from "@/lib/api";
 
@@ -45,6 +33,11 @@ export default function StudentDashboard() {
   const [inviteCode, setInviteCode] = useState("");
   const [joinLoading, setJoinLoading] = useState(false);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchData = useCallback(async (token: string) => {
     try {
@@ -52,13 +45,15 @@ export default function StudentDashboard() {
       const [examsData, submissionsData, classesData] = await Promise.all([
         getExams(token),
         getMySubmissions(token),
-        getClasses(token)
+        getClasses(token),
       ]);
       setExams(Array.isArray(examsData) ? examsData : []);
       setSubmissions(Array.isArray(submissionsData) ? submissionsData : []);
       setClasses(Array.isArray(classesData) ? classesData : []);
     } catch (err: any) {
-      setError("Không thể kết nối máy chủ. Vui lòng kiểm tra lại đường truyền.");
+      setError(
+        "Không thể kết nối máy chủ. Vui lòng kiểm tra lại đường truyền."
+      );
       console.error(err);
     } finally {
       setLoading(false);
@@ -79,7 +74,7 @@ export default function StudentDashboard() {
   const handleJoinClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteCode.trim()) return;
-    
+
     setJoinLoading(true);
     const cookies = document.cookie.split("; ");
     const tokenCookie = cookies.find((row) => row.startsWith("token="));
@@ -92,7 +87,9 @@ export default function StudentDashboard() {
       alert("Tham gia lớp học thành công!");
       fetchData(t);
     } catch (err: any) {
-      alert(err.message || "Mã mời không chính xác hoặc bạn đã trong lớp này.");
+      alert(
+        err.message || "Mã mời không chính xác hoặc bạn đã trong lớp này."
+      );
     } finally {
       setJoinLoading(false);
     }
@@ -103,284 +100,528 @@ export default function StudentDashboard() {
     router.push("/login");
   };
 
+  const pendingExams = exams.filter(
+    (e) => !submissions.some((s) => s.exam_id === e.id)
+  );
+  const avgScore =
+    submissions.length > 0
+      ? (
+          submissions.reduce((acc, curr) => acc + curr.score, 0) /
+          submissions.length
+        ).toFixed(1)
+      : "0.0";
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent shadow-indigo-500/20 shadow-xl"></div>
-          <p className="text-slate-500 font-medium animate-pulse text-sm">Đang tải dữ liệu học tập...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#042F2E]">
+        <div className="flex flex-col items-center gap-5">
+          <div className="relative">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#0D9488] to-[#2DD4BF] flex items-center justify-center shadow-2xl shadow-teal-500/30">
+              <GraduationCap className="w-7 h-7 text-white animate-pulse" />
+            </div>
+            <div className="absolute -inset-2 rounded-2xl border border-[#2DD4BF]/20 animate-ping" />
+          </div>
+          <div className="space-y-2 text-center">
+            <p className="text-[#99F6E4] font-semibold text-sm">
+              Đang tải dữ liệu học tập...
+            </p>
+            <div className="flex gap-1 justify-center">
+              <div className="w-1.5 h-1.5 rounded-full bg-[#2DD4BF] animate-bounce [animation-delay:0ms]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#2DD4BF] animate-bounce [animation-delay:150ms]" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#2DD4BF] animate-bounce [animation-delay:300ms]" />
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-indigo-100 selection:text-indigo-900 font-sans">
-      
-      {/* PROFESSIONAL NAVBAR */}
-      <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-white/70 backdrop-blur-xl">
+    <div className="min-h-screen bg-[#042F2E] font-sans">
+      {/* Background effects */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-[#0D9488]/8 blur-[120px]" />
+        <div className="absolute bottom-[-15%] right-[-5%] w-[500px] h-[500px] rounded-full bg-[#2DD4BF]/6 blur-[100px]" />
+        <div className="absolute top-[40%] right-[10%] w-[300px] h-[300px] rounded-full bg-[#F97316]/4 blur-[80px]" />
+      </div>
+
+      {/* Navbar */}
+      <nav className="sticky top-0 z-50 w-full border-b border-white/[0.06] bg-[#042F2E]/80 backdrop-blur-2xl">
         <div className="mx-auto max-w-7xl flex h-16 items-center px-4 sm:px-6 lg:px-8 justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 shadow-lg shadow-indigo-200">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#0D9488] to-[#2DD4BF] shadow-lg shadow-teal-500/20">
               <GraduationCap className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-slate-900 border-r border-slate-200 pr-4 mr-4 hidden sm:block">
-              SKY<span className="text-indigo-600">-EXAM</span>
+            <span className="text-lg font-bold tracking-tight text-white hidden sm:block font-mono">
+              SKY<span className="text-[#2DD4BF]">-EXAM</span>
             </span>
-            <div className="flex items-center gap-1 text-slate-500 text-sm font-medium">
-              <LayoutDashboard className="h-4 w-4" />
-              <span>Bảng điều khiển</span>
-            </div>
+            <div className="hidden sm:block w-px h-6 bg-white/10 mx-1" />
+            <span className="hidden sm:flex items-center gap-1.5 text-[#99F6E4]/40 text-xs font-semibold uppercase tracking-widest">
+              <Sparkles className="w-3 h-3" />
+              Student Portal
+            </span>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900 transition-colors" onClick={logout}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Đăng xuất
-            </Button>
-            <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-indigo-700 font-bold text-xs ring-2 ring-white">
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-[#99F6E4]/50 hover:text-white hover:bg-white/[0.06] transition-all duration-200 text-xs font-semibold cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Đăng xuất</span>
+            </button>
+            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-[#0D9488]/30 to-[#2DD4BF]/30 border border-white/10 flex items-center justify-center text-[#2DD4BF] font-bold text-xs">
               S
             </div>
           </div>
         </div>
       </nav>
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-10">
-        
-        {/* HERO SECTION / QUICK JOIN */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-7 space-y-4">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900">
-                Lớp học <span className="text-indigo-600">Trực tuyến</span> 
-                <br/>Quản trị kiến thức 4.0
-            </h1>
-            <p className="max-w-xl text-lg text-slate-500 leading-relaxed font-medium">
-                Tham gia các lớp học của giáo viên để nhận đề thi, theo dõi điểm số và rèn luyện kỹ năng mỗi ngày.
+      <main
+        className={`relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 md:py-10 space-y-8 transition-all duration-700 ease-out ${
+          mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+        }`}
+      >
+        {/* Hero + Join Class */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch">
+          {/* Hero text */}
+          <div className="lg:col-span-3 flex flex-col justify-center space-y-5">
+            <div>
+              <p className="text-[#2DD4BF] text-xs font-bold uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                <Zap className="w-3.5 h-3.5" />
+                Chào mừng trở lại
+              </p>
+              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-[1.15]">
+                Quản trị kiến thức
+                <br />
+                <span className="bg-gradient-to-r from-[#2DD4BF] to-[#0D9488] bg-clip-text text-transparent">
+                  Trực tuyến 4.0
+                </span>
+              </h1>
+            </div>
+            <p className="text-[#99F6E4]/40 text-sm leading-relaxed font-medium max-w-md">
+              Tham gia lớp học, hoàn thành bài thi và theo dõi kết quả học tập
+              trong thời gian thực.
             </p>
-          </div>
-          
-          <div className="lg:col-span-5">
-            <Card className="border-none shadow-2xl shadow-indigo-200/50 bg-white overflow-hidden relative">
-              <div className="absolute top-0 right-0 p-8 opacity-5 text-indigo-600 pointer-events-none">
-                <PlusCircle className="w-32 h-32" />
+
+            {/* Quick stats inline */}
+            <div className="flex gap-3 pt-2">
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+                <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-xs font-semibold text-white/70">
+                  {pendingExams.length} chưa nộp
+                </span>
               </div>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl font-bold text-slate-900">Vào lớp học mới</CardTitle>
-                <CardDescription>Nhập mã tham gia do giáo viên cung cấp</CardDescription>
-              </CardHeader>
-              <CardContent>
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-semibold text-white/70">
+                  {submissions.length} đã hoàn thành
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Join class card */}
+          <div className="lg:col-span-2">
+            <div className="relative h-full rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl overflow-hidden group">
+              <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[#F97316] to-transparent" />
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#F97316]/10 border border-[#F97316]/20 flex items-center justify-center">
+                    <PlusCircle className="w-5 h-5 text-[#F97316]" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white">
+                      Vào lớp học mới
+                    </h3>
+                    <p className="text-[10px] text-white/30 font-medium">
+                      Nhập mã do giáo viên cung cấp
+                    </p>
+                  </div>
+                </div>
                 <form onSubmit={handleJoinClass} className="flex gap-2">
-                  <div className="relative flex-1 group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                    <Input 
-                      placeholder="VD: LOP12-A1" 
+                  <div className="relative flex-1 group/input">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/20 group-focus-within/input:text-[#F97316] transition-colors" />
+                    <input
+                      id="join-class-code"
+                      placeholder="VD: LOP12-A1"
                       value={inviteCode}
                       onChange={(e) => setInviteCode(e.target.value)}
-                      className="pl-10 h-12 bg-slate-50 border-slate-200 focus-visible:ring-indigo-600 rounded-xl font-medium tracking-wider"
+                      className="w-full h-11 pl-9 pr-4 rounded-xl bg-white/[0.05] border border-white/[0.08] text-white placeholder-white/15 text-sm font-mono font-medium tracking-wider transition-all duration-200 focus:outline-none focus:border-[#F97316]/40 focus:ring-2 focus:ring-[#F97316]/10"
                     />
                   </div>
-                  <Button 
-                    type="submit" 
-                    disabled={joinLoading || !inviteCode} 
-                    className="h-12 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 rounded-xl px-6 font-bold"
+                  <button
+                    type="submit"
+                    disabled={joinLoading || !inviteCode}
+                    className="h-11 px-5 rounded-xl bg-[#F97316] hover:bg-[#EA580C] text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
                   >
-                    {joinLoading ? "..." : "Tham gia"}
-                  </Button>
+                    {joinLoading ? (
+                      "..."
+                    ) : (
+                      <>
+                        <ArrowRight className="w-4 h-4" />
+                        <span className="hidden sm:inline">Tham gia</span>
+                      </>
+                    )}
+                  </button>
                 </form>
-              </CardContent>
-              <CardFooter className="bg-slate-50/50 border-t border-slate-100 py-3 flex justify-center">
-                <p className="text-xs text-slate-400 font-medium italic">Không có mã mời? Liên hệ giáo viên chủ nhiệm của bạn.</p>
-              </CardFooter>
-            </Card>
+                <p className="text-[10px] text-white/15 font-medium text-center italic">
+                  Không có mã mời? Liên hệ giáo viên chủ nhiệm.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* STATS SECTION */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden hover:border-indigo-200 transition-all duration-300">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Bài thi chưa nộp</CardTitle>
-                    <div className="p-2 bg-amber-50 rounded-lg"><Clock className="h-4 w-4 text-amber-500" /></div>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-3xl font-bold text-slate-900">{exams.filter(e => !submissions.some(s => s.exam_id === e.id)).length}</div>
-                </CardContent>
-            </Card>
-            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden hover:border-indigo-200 transition-all duration-300">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Bài thi đã hoàn thành</CardTitle>
-                    <div className="p-2 bg-emerald-50 rounded-lg"><CheckCircle2 className="h-4 w-4 text-emerald-500" /></div>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-3xl font-bold text-slate-900">{submissions.length}</div>
-                </CardContent>
-            </Card>
-            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden hover:border-indigo-200 transition-all duration-300">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                    <CardTitle className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Điểm trung bình</CardTitle>
-                    <div className="p-2 bg-indigo-50 rounded-lg"><Trophy className="h-4 w-4 text-indigo-500" /></div>
-                </CardHeader>
-                <CardContent>
-                    <div className="text-3xl font-bold text-indigo-600">
-                        {submissions.length > 0 ? (submissions.reduce((acc, curr) => acc + curr.score, 0) / submissions.length).toFixed(1) : "0.0"}
-                    </div>
-                </CardContent>
-            </Card>
+        {/* Stats cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            {
+              label: "Bài thi chưa nộp",
+              value: pendingExams.length,
+              icon: Clock,
+              color: "amber",
+              gradient: "from-amber-500/10 to-amber-500/5",
+              iconBg: "bg-amber-500/10 border-amber-500/20",
+              iconColor: "text-amber-400",
+              valueColor: "text-amber-300",
+            },
+            {
+              label: "Đã hoàn thành",
+              value: submissions.length,
+              icon: CheckCircle2,
+              color: "emerald",
+              gradient: "from-emerald-500/10 to-emerald-500/5",
+              iconBg: "bg-emerald-500/10 border-emerald-500/20",
+              iconColor: "text-emerald-400",
+              valueColor: "text-emerald-300",
+            },
+            {
+              label: "Điểm trung bình",
+              value: avgScore,
+              icon: Trophy,
+              color: "teal",
+              gradient: "from-[#2DD4BF]/10 to-[#2DD4BF]/5",
+              iconBg: "bg-[#2DD4BF]/10 border-[#2DD4BF]/20",
+              iconColor: "text-[#2DD4BF]",
+              valueColor: "text-[#2DD4BF]",
+            },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              className="relative rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm overflow-hidden hover:border-white/[0.12] transition-all duration-300 group cursor-default"
+            >
+              <div
+                className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
+              />
+              <div className="relative p-5 flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30">
+                    {stat.label}
+                  </p>
+                  <p className={`text-3xl font-black ${stat.valueColor}`}>
+                    {stat.value}
+                  </p>
+                </div>
+                <div
+                  className={`w-11 h-11 rounded-xl ${stat.iconBg} border flex items-center justify-center`}
+                >
+                  <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* LIST SECTION: TABS STYLE */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-            
-            {/* EXAM LIST (MAIN) */}
-            <div className="xl:col-span-2 space-y-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <BookOpen className="h-6 w-6 text-indigo-600" />
-                        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kỳ thi Công Khai</h2>
-                    </div>
+        {/* Main content grid */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* Exams list */}
+          <div className="xl:col-span-2 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#0D9488]/10 border border-[#0D9488]/20 flex items-center justify-center">
+                  <BookOpen className="w-4 h-4 text-[#2DD4BF]" />
                 </div>
-
-                {exams.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-2xl bg-white/50 text-center">
-                        <AlertCircle className="h-12 w-12 text-slate-300 mb-4" />
-                        <h3 className="text-lg font-bold text-slate-800">Trống rỗng_</h3>
-                        <p className="text-slate-500 max-w-xs mt-1">Bạn chưa tham gia lớp học nào hoặc giáo viên chưa giao đề thi mới.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {exams.map((exam) => {
-                            const isSubmitted = submissions.some(s => s.exam_id === exam.id);
-                            return (
-                                <Card key={exam.id} className="group relative border-slate-200 hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300 cursor-pointer overflow-hidden rounded-2xl bg-white">
-                                    <div className={`absolute top-0 right-0 h-1.5 w-full ${isSubmitted ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
-                                    <CardHeader className="pb-3">
-                                        <div className="flex justify-between items-start mb-3">
-                                            <Badge variant={isSubmitted ? "outline" : "default"} className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${isSubmitted ? 'border-emerald-200 text-emerald-600 bg-emerald-50' : 'bg-indigo-600 text-white'}`}>
-                                                {isSubmitted ? "Đã Nộp" : "Live"}
-                                            </Badge>
-                                            <div className="flex items-center text-slate-400 text-xs font-semibold">
-                                                <Clock className="h-3 w-3 mr-1" />
-                                                <span>{exam.time_limit} phút</span>
-                                            </div>
-                                        </div>
-                                        <CardTitle className="text-lg font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-indigo-600 transition-colors">
-                                            {exam.title}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardFooter className="pt-2">
-                                        <Button 
-                                            disabled={isSubmitted} 
-                                            variant={isSubmitted ? "secondary" : "default"}
-                                            className={`w-full h-10 rounded-xl font-bold text-xs uppercase tracking-widest ${!isSubmitted ? 'bg-slate-900 border-none hover:bg-indigo-600 shadow-md transform group-hover:scale-[1.02] transition-all' : ''}`}
-                                            onClick={() => !isSubmitted && router.push(`/student/exams/${exam.id}/take`)}
-                                        >
-                                            {isSubmitted ? (
-                                                <><CheckCircle2 className="mr-2 h-4 w-4" /> Kết thúc</>
-                                            ) : (
-                                                <><PlayCircle className="mr-2 h-4 w-4" /> Bắt đầu ngay</>
-                                            )}
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-            
-            {/* CLASSES LIST SECTION */}
-            <div className="xl:col-span-2 space-y-6 pt-4 border-t border-slate-100 mt-8">
-                <div className="flex items-center gap-2">
-                    <GraduationCap className="h-6 w-6 text-emerald-600" />
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Lớp của tôi</h2>
-                </div>
-                
-                {classes.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-2xl bg-white/50 text-center">
-                        <AlertCircle className="h-12 w-12 text-slate-300 mb-4" />
-                        <h3 className="text-lg font-bold text-slate-800">Chưa tham gia lớp nào</h3>
-                        <p className="text-slate-500 max-w-xs mt-1">Gõ mã mời ở phía trên để tham gia các lớp học.</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {classes.map((c: any) => (
-                            <Card key={c.id} className="group relative border-slate-200 hover:border-emerald-400 hover:shadow-xl hover:shadow-emerald-500/5 transition-all duration-300 cursor-pointer overflow-hidden rounded-2xl bg-white" onClick={() => router.push(`/student/classes/${c.id}`)}>
-                                <div className="absolute top-0 right-0 h-1.5 w-full bg-emerald-500" />
-                                <CardHeader className="pb-4 pt-6">
-                                    <Badge variant="outline" className="w-max rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border-emerald-200 text-emerald-600 bg-emerald-50 mb-3">
-                                        Lớp Học #{c.id}
-                                    </Badge>
-                                    <CardTitle className="text-xl font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-emerald-600 transition-colors">
-                                        {c.name}
-                                    </CardTitle>
-                                </CardHeader>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                <h2 className="text-lg font-bold text-white tracking-tight">
+                  Kỳ thi Công Khai
+                </h2>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">
+                {exams.length} đề
+              </span>
             </div>
 
-            {/* SUBMISSION HISTORY (SIDEBAR) */}
-            <div className="space-y-6">
-                <div className="flex items-center gap-2">
-                    <Trophy className="h-6 w-6 text-indigo-600" />
-                    <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Kết quả gần đây</h2>
+            {exams.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-14 border border-dashed border-white/[0.08] rounded-2xl bg-white/[0.02] text-center">
+                <div className="w-14 h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-4">
+                  <AlertCircle className="h-7 w-7 text-white/15" />
                 </div>
-                
-                <Card className="border-slate-200 shadow-sm bg-white overflow-hidden rounded-2xl">
-                    <Table>
-                        <TableHeader className="bg-slate-50/50">
-                            <TableRow className="border-slate-100 hover:bg-transparent">
-                                <TableHead className="font-bold text-slate-600 uppercase text-[10px] tracking-widest">Kỳ thi</TableHead>
-                                <TableHead className="text-right font-bold text-slate-600 uppercase text-[10px] tracking-widest">Điểm</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {submissions.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={2} className="h-32 text-center text-slate-400 text-xs italic">Chưa có kết quả.</TableCell>
-                                </TableRow>
+                <h3 className="text-sm font-bold text-white/50">
+                  Chưa có đề thi
+                </h3>
+                <p className="text-white/20 text-xs max-w-xs mt-1.5 leading-relaxed">
+                  Bạn chưa tham gia lớp học nào hoặc giáo viên chưa giao đề thi
+                  mới.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {exams.map((exam) => {
+                  const isSubmitted = submissions.some(
+                    (s) => s.exam_id === exam.id
+                  );
+                  return (
+                    <div
+                      key={exam.id}
+                      className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm overflow-hidden hover:border-white/[0.12] transition-all duration-300 cursor-pointer"
+                      onClick={() =>
+                        !isSubmitted &&
+                        router.push(`/student/exams/${exam.id}/take`)
+                      }
+                    >
+                      {/* Top accent */}
+                      <div
+                        className={`h-[2px] w-full ${
+                          isSubmitted
+                            ? "bg-gradient-to-r from-transparent via-emerald-400 to-transparent"
+                            : "bg-gradient-to-r from-transparent via-[#2DD4BF] to-transparent"
+                        }`}
+                      />
+
+                      <div className="p-5 space-y-4">
+                        <div className="flex justify-between items-start">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                              isSubmitted
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : "bg-[#2DD4BF]/10 text-[#2DD4BF] border border-[#2DD4BF]/20"
+                            }`}
+                          >
+                            {isSubmitted ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Đã Nộp
+                              </>
                             ) : (
-                                submissions.map((sub, i) => (
-                                    <TableRow key={sub.id} className="border-slate-50 hover:bg-slate-50/50 transition-colors group">
-                                        <TableCell>
-                                            <div className="font-semibold text-slate-700 text-sm truncate max-w-[150px]">{sub.exam_id}</div>
-                                            <div className="text-[10px] text-slate-400 mt-0.5">{new Date(sub.submitted_at).toLocaleDateString("vi-VN")}</div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <div className={`text-lg font-black ${
-                                                sub.score >= 8 ? "text-emerald-500" : sub.score >= 5 ? "text-amber-500" : "text-rose-500"
-                                            }`}>
-                                                {sub.score?.toFixed(1) || "0.0"}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
+                              <>
+                                <Zap className="w-3 h-3 mr-1" />
+                                Live
+                              </>
                             )}
-                        </TableBody>
-                    </Table>
-                    {submissions.length > 0 && (
-                        <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex justify-center">
-                             <Button variant="link" size="sm" className="text-xs text-indigo-600 font-bold uppercase tracking-widest decoration-2" onClick={() => router.push("/student/submissions")}>Xem tất cả</Button>
+                          </span>
+                          <div className="flex items-center gap-1 text-white/25 text-[11px] font-semibold">
+                            <Clock className="h-3 w-3" />
+                            <span>{exam.time_limit} phút</span>
+                          </div>
                         </div>
-                    )}
-                </Card>
+
+                        <h3 className="text-sm font-bold text-white/80 line-clamp-2 leading-snug group-hover:text-white transition-colors duration-200">
+                          {exam.title}
+                        </h3>
+
+                        <button
+                          disabled={isSubmitted}
+                          className={`w-full h-10 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+                            isSubmitted
+                              ? "bg-white/[0.04] text-white/20 cursor-not-allowed"
+                              : "bg-gradient-to-r from-[#0D9488] to-[#0F766E] text-white hover:from-[#0F766E] hover:to-[#0D9488] shadow-lg shadow-teal-500/10 group-hover:shadow-teal-500/20"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isSubmitted)
+                              router.push(`/student/exams/${exam.id}/take`);
+                          }}
+                        >
+                          {isSubmitted ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Kết thúc
+                            </>
+                          ) : (
+                            <>
+                              <PlayCircle className="w-3.5 h-3.5" /> Bắt đầu
+                              ngay
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Classes section */}
+            <div className="pt-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <h2 className="text-lg font-bold text-white tracking-tight">
+                    Lớp của tôi
+                  </h2>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white/20">
+                  {classes.length} lớp
+                </span>
+              </div>
+
+              {classes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-10 border border-dashed border-white/[0.08] rounded-2xl bg-white/[0.02] text-center">
+                  <div className="w-14 h-14 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-4">
+                    <Users className="h-7 w-7 text-white/15" />
+                  </div>
+                  <h3 className="text-sm font-bold text-white/50">
+                    Chưa tham gia lớp nào
+                  </h3>
+                  <p className="text-white/20 text-xs max-w-xs mt-1.5">
+                    Gõ mã mời ở phía trên để tham gia các lớp học.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {classes.map((c: any) => (
+                    <div
+                      key={c.id}
+                      className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm overflow-hidden hover:border-emerald-500/20 transition-all duration-300 cursor-pointer"
+                      onClick={() => router.push(`/student/classes/${c.id}`)}
+                    >
+                      <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent" />
+                      <div className="p-5 flex items-center justify-between">
+                        <div className="space-y-1.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            Lớp #{c.id}
+                          </span>
+                          <h3 className="text-sm font-bold text-white/80 group-hover:text-white transition-colors">
+                            {c.name}
+                          </h3>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-white/10 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all duration-200" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Sidebar - Recent results */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-[#F97316]/10 border border-[#F97316]/20 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-[#F97316]" />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight">
+                Kết quả gần đây
+              </h2>
             </div>
 
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm overflow-hidden">
+              {submissions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-10 text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center mb-3">
+                    <Target className="h-6 w-6 text-white/15" />
+                  </div>
+                  <p className="text-white/25 text-xs italic font-medium">
+                    Chưa có kết quả nào.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="divide-y divide-white/[0.04]">
+                    {submissions.slice(0, 8).map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group"
+                      >
+                        <div className="space-y-0.5 min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-white/60 truncate group-hover:text-white/80 transition-colors">
+                            Kỳ thi #{sub.exam_id}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[10px] text-white/20 font-medium">
+                            <CalendarDays className="w-3 h-3" />
+                            <span>
+                              {new Date(sub.submitted_at).toLocaleDateString(
+                                "vi-VN"
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                        <div
+                          className={`text-xl font-black font-mono tabular-nums ${
+                            sub.score >= 8
+                              ? "text-emerald-400"
+                              : sub.score >= 5
+                              ? "text-amber-400"
+                              : "text-rose-400"
+                          }`}
+                        >
+                          {sub.score?.toFixed(1) || "0.0"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {submissions.length > 0 && (
+                    <div className="p-4 border-t border-white/[0.04] flex justify-center">
+                      <button
+                        className="text-[10px] font-bold uppercase tracking-widest text-[#2DD4BF]/60 hover:text-[#2DD4BF] transition-colors cursor-pointer flex items-center gap-1.5"
+                        onClick={() => router.push("/student/submissions")}
+                      >
+                        Xem tất cả
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Average score highlight card */}
+            {submissions.length > 0 && (
+              <div className="rounded-2xl border border-[#2DD4BF]/10 bg-gradient-to-br from-[#0D9488]/10 to-[#2DD4BF]/5 backdrop-blur-sm overflow-hidden">
+                <div className="p-5 text-center space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#99F6E4]/40">
+                    Điểm tổng kết
+                  </p>
+                  <p className="text-4xl font-black text-[#2DD4BF] font-mono tabular-nums">
+                    {avgScore}
+                  </p>
+                  <p className="text-[10px] text-white/20 font-medium">
+                    Trung bình từ {submissions.length} bài thi
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
-      <footer className="mx-auto max-w-7xl px-4 py-12 border-t border-slate-200 mt-12">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-sm font-medium">
-            <p>© 2026 SKY-EXAM Learning System.</p>
-            <div className="flex gap-6 uppercase tracking-widest text-[10px]">
-                <a href="#" className="hover:text-indigo-600 transition-colors">Điều khoản</a>
-                <a href="#" className="hover:text-indigo-600 transition-colors">Bảo mật</a>
-                <a href="#" className="hover:text-indigo-600 transition-colors">Hỗ trợ</a>
-            </div>
+      {/* Footer */}
+      <footer className="relative z-10 mx-auto max-w-7xl px-4 py-10 border-t border-white/[0.04] mt-10">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-white/15 text-xs font-medium">
+          <p>© 2026 SKY-EXAM Learning System.</p>
+          <div className="flex gap-6 uppercase tracking-widest text-[10px] font-semibold">
+            <a
+              href="#"
+              className="hover:text-[#2DD4BF] transition-colors cursor-pointer"
+            >
+              Điều khoản
+            </a>
+            <a
+              href="#"
+              className="hover:text-[#2DD4BF] transition-colors cursor-pointer"
+            >
+              Bảo mật
+            </a>
+            <a
+              href="#"
+              className="hover:text-[#2DD4BF] transition-colors cursor-pointer"
+            >
+              Hỗ trợ
+            </a>
+          </div>
         </div>
       </footer>
-
     </div>
   );
 }
