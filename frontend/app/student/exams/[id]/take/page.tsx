@@ -26,10 +26,12 @@ import {
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { getExam, submitExam, getMe } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function TakeExamPage() {
   const router = useRouter();
   const { id } = useParams();
+  const { isAuthenticated, loading: isLoading, user } = useAuth();
   const [exam, setExam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -46,11 +48,11 @@ export default function TakeExamPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
-  const fetchExamData = useCallback(async (token: string) => {
+  const fetchExamData = useCallback(async () => {
     try {
       const [examData, userData] = await Promise.all([
-        getExam(Number(id), token),
-        getMe(token)
+        getExam(Number(id)),
+        getMe()
       ]);
       
       if (examData.detail) throw new Error(examData.detail);
@@ -61,7 +63,6 @@ export default function TakeExamPage() {
         setTimeLeft(examData.time_limit * 60);
       }
 
-      // Initialize WebSocket for Anti-cheat
       const wsUrl = `ws://127.0.0.1:8000/ws/anti-cheat/${id}/${userData.id}`;
       const socket = new WebSocket(wsUrl);
       
@@ -79,20 +80,18 @@ export default function TakeExamPage() {
   }, [id]);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (tokenCookie) {
-      const t = tokenCookie.split("=")[1];
-      fetchExamData(t);
-    } else {
+    if (isLoading) return;
+    if (!isAuthenticated || user?.role !== "student") {
       router.push("/login");
+      return;
     }
+    fetchExamData();
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (socketRef.current) socketRef.current.close();
     };
-  }, [fetchExamData, router]);
+  }, [isAuthenticated, isLoading, user, router, fetchExamData]);
 
   // Anti-cheat: Detect tab switching
   useEffect(() => {
@@ -135,7 +134,6 @@ export default function TakeExamPage() {
   const handleSubmit = async () => {
     if (isSubmitting || isFinished) return;
 
-    // Validate if all questions are answered
     const answeredCount = Object.keys(answers).length;
     const totalCount = exam?.questions?.length || 0;
 
@@ -146,10 +144,6 @@ export default function TakeExamPage() {
     }
 
     setIsSubmitting(true);
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) return;
-    const t = tokenCookie.split("=")[1];
 
     try {
       const submissionData = Object.entries(answers).map(([qId, cId]) => ({
@@ -157,11 +151,10 @@ export default function TakeExamPage() {
         choice_id: cId,
       }));
 
-      const res = await submitExam(Number(id), submissionData, t, cheatCount);
+      const res = await submitExam(Number(id), submissionData, cheatCount);
       setResult(res);
       setIsFinished(true);
       
-      // FIREWORKS!
       confetti({
         particleCount: 150,
         spread: 70,

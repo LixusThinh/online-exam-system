@@ -14,10 +14,12 @@ import {
 } from "@/components/ui/table";
 import { Loader2, ArrowLeft, Trophy, Clock, FileText, CheckCircle2, UserCircle2, ArrowRight } from "lucide-react";
 import { getExamSubmissions, getExam } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function SubmissionsPage() {
   const params = useParams();
   const router = useRouter();
+  const { isAuthenticated, loading: isLoading, user } = useAuth();
   const examId = params.id as string;
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [exam, setExam] = useState<any>(null);
@@ -25,11 +27,11 @@ export default function SubmissionsPage() {
   const [error, setError] = useState("");
   const [liveEvents, setLiveEvents] = useState<{id: number, message: string, type: string}[]>([]);
 
-  const fetchData = useCallback(async (token: string) => {
+  const fetchData = useCallback(async () => {
     try {
       const [examData, submissionsData] = await Promise.all([
-        getExam(examId, token),
-        getExamSubmissions(examId, token)
+        getExam(examId),
+        getExamSubmissions(examId)
       ]);
       setExam(examData);
       setSubmissions(Array.isArray(submissionsData) ? submissionsData : []);
@@ -41,15 +43,13 @@ export default function SubmissionsPage() {
   }, [examId]);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (tokenCookie) {
-      const t = tokenCookie.split("=")[1];
-      fetchData(t);
-    } else {
+    if (isLoading) return;
+    if (!isAuthenticated || (user?.role !== "teacher" && user?.role !== "admin")) {
       router.push("/login");
+      return;
     }
-  }, [fetchData, router]);
+    fetchData();
+  }, [isAuthenticated, isLoading, user, router, fetchData]);
 
   useEffect(() => {
     if (!examId) return;
@@ -64,10 +64,7 @@ export default function SubmissionsPage() {
         } else if (data.type === "submit") {
           const msg = `✅ Thí sinh ${data.student_name || data.student_id} vừa nộp bài!`;
           setLiveEvents(prev => [{id: Date.now(), message: msg, type: "success"}, ...prev].slice(0, 5));
-          
-          // Refetch data
-          const tokenCookie = document.cookie.split("; ").find((row) => row.startsWith("token="));
-          if (tokenCookie) fetchData(tokenCookie.split("=")[1]);
+          fetchData();
         }
       } catch (e) {}
     };

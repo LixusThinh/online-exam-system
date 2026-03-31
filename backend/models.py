@@ -1,4 +1,15 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Enum, DateTime, Table, JSON
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Float,
+    Boolean,
+    ForeignKey,
+    Enum,
+    DateTime,
+    Table,
+    JSON,
+)
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
@@ -18,9 +29,11 @@ class UserRole(str, enum.Enum):
     TEACHER = "teacher"
     STUDENT = "student"
 
+
 class SubmissionStatus(str, enum.Enum):
     IN_PROGRESS = "in_progress"
     SUBMITTED = "submitted"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -29,11 +42,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String)
-    role: Mapped[str] = mapped_column(
-        String(20), 
-        nullable=False,
-        default="student"
-    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="student")
     permissions = Column(JSON, default=list)
 
     # Quan hệ 1-N: Teacher sở hữu Class / Quiz
@@ -42,7 +51,15 @@ class User(Base):
     submissions = relationship("Submission", back_populates="student")
 
     # Quan hệ N-N: Sinh viên tham gia nhiều Lớp
-    enrolled_classes = relationship("Class", secondary=enrollments, back_populates="students")
+    enrolled_classes = relationship(
+        "Class", secondary=enrollments, back_populates="students"
+    )
+
+    # Quan hệ 1-N: Refresh tokens
+    refresh_tokens = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+
 
 class Class(Base):
     __tablename__ = "classes"
@@ -56,21 +73,27 @@ class Class(Base):
     quizzes = relationship("Quiz", back_populates="classroom")
 
     # Quan hệ N-N: Lớp có nhiều Sinh viên
-    students = relationship("User", secondary=enrollments, back_populates="enrolled_classes")
+    students = relationship(
+        "User", secondary=enrollments, back_populates="enrolled_classes"
+    )
+
 
 class Quiz(Base):
     __tablename__ = "quizzes"
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
-    time_limit = Column(Integer) # Phút
+    time_limit = Column(Integer)  # Phút
     password = Column(String, nullable=True)
     teacher_id = Column(Integer, ForeignKey("users.id"))
     class_id = Column(Integer, ForeignKey("classes.id"))
 
     teacher = relationship("User", back_populates="quizzes")
     classroom = relationship("Class", back_populates="quizzes")
-    questions = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
+    questions = relationship(
+        "Question", back_populates="quiz", cascade="all, delete-orphan"
+    )
+
 
 class Question(Base):
     __tablename__ = "questions"
@@ -81,7 +104,10 @@ class Question(Base):
     points = Column(Float, default=1.0)
 
     quiz = relationship("Quiz", back_populates="questions")
-    choices = relationship("Choice", back_populates="question", cascade="all, delete-orphan")
+    choices = relationship(
+        "Choice", back_populates="question", cascade="all, delete-orphan"
+    )
+
 
 class Choice(Base):
     __tablename__ = "choices"
@@ -92,6 +118,7 @@ class Choice(Base):
     is_correct = Column(Boolean, default=False)
 
     question = relationship("Question", back_populates="choices")
+
 
 class Submission(Base):
     __tablename__ = "submissions"
@@ -106,3 +133,17 @@ class Submission(Base):
     cheat_count = Column(Integer, default=0)
 
     student = relationship("User", back_populates="submissions")
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(String, unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    revoked = Column(Boolean, default=False)
+    replaced_by_token = Column(String, nullable=True)
+
+    user = relationship("User", back_populates="refresh_tokens")

@@ -23,9 +23,11 @@ import {
   Target,
 } from "lucide-react";
 import { getExams, getMySubmissions, joinClass, getClasses } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function StudentDashboard() {
   const router = useRouter();
+  const { logout, user, loading: authLoading } = useAuth();
   const [exams, setExams] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -39,13 +41,13 @@ export default function StudentDashboard() {
     setMounted(true);
   }, []);
 
-  const fetchData = useCallback(async (token: string) => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [examsData, submissionsData, classesData] = await Promise.all([
-        getExams(token),
-        getMySubmissions(token),
-        getClasses(token),
+        getExams(),
+        getMySubmissions(),
+        getClasses(),
       ]);
       setExams(Array.isArray(examsData) ? examsData : []);
       setSubmissions(Array.isArray(submissionsData) ? submissionsData : []);
@@ -61,31 +63,26 @@ export default function StudentDashboard() {
   }, []);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (tokenCookie) {
-      const t = tokenCookie.split("=")[1];
-      fetchData(t);
-    } else {
-      router.push("/login");
+    if (!authLoading) {
+      if (!user) {
+        router.push("/login");
+      } else {
+        fetchData();
+      }
     }
-  }, [fetchData, router]);
+  }, [user, authLoading, fetchData, router]);
 
   const handleJoinClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteCode.trim()) return;
 
     setJoinLoading(true);
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) return;
-    const t = tokenCookie.split("=")[1];
 
     try {
-      await joinClass(inviteCode.trim(), t);
+      await joinClass(inviteCode.trim());
       setInviteCode("");
       alert("Tham gia lớp học thành công!");
-      fetchData(t);
+      fetchData();
     } catch (err: any) {
       alert(
         err.message || "Mã mời không chính xác hoặc bạn đã trong lớp này."
@@ -93,11 +90,6 @@ export default function StudentDashboard() {
     } finally {
       setJoinLoading(false);
     }
-  };
-
-  const logout = () => {
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-    router.push("/login");
   };
 
   const pendingExams = exams.filter(
@@ -164,7 +156,7 @@ export default function StudentDashboard() {
 
           <div className="flex items-center gap-3">
             <button
-              onClick={logout}
+              onClick={() => logout()}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-[#99F6E4]/50 hover:text-white hover:bg-white/[0.06] transition-all duration-200 text-xs font-semibold cursor-pointer"
             >
               <LogOut className="h-4 w-4" />

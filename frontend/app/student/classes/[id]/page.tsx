@@ -7,22 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle2, PlayCircle, AlertCircle, ArrowLeft, GraduationCap } from "lucide-react";
 import { getClassExams, getMySubmissions } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function StudentClassPage() {
   const router = useRouter();
   const params = useParams();
+  const { isAuthenticated, loading: isLoading, user } = useAuth();
   const classId = params.id as string;
   const [exams, setExams] = useState<any[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchData = useCallback(async (token: string) => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [examsData, submissionsData] = await Promise.all([
-        getClassExams(classId, token),
-        getMySubmissions(token)
+        getClassExams(classId),
+        getMySubmissions()
       ]);
       setExams(Array.isArray(examsData) ? examsData : []);
       setSubmissions(Array.isArray(submissionsData) ? submissionsData : []);
@@ -34,14 +36,13 @@ export default function StudentClassPage() {
   }, [classId]);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (tokenCookie) {
-      fetchData(tokenCookie.split("=")[1]);
-    } else {
+    if (isLoading) return;
+    if (!isAuthenticated || user?.role !== "student") {
       router.push("/login");
+      return;
     }
-  }, [fetchData, router]);
+    fetchData();
+  }, [isAuthenticated, isLoading, user, router, fetchData]);
 
   if (loading) {
     return (

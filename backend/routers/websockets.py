@@ -5,10 +5,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/ws",
-    tags=["WebSockets"]
-)
+router = APIRouter(prefix="/ws", tags=["WebSockets"])
+
 
 class ConnectionManager:
     def __init__(self):
@@ -27,7 +25,10 @@ class ConnectionManager:
         logger.info(f"Teacher connected to exam room {exam_id}")
 
     def disconnect_teacher(self, websocket: WebSocket, exam_id: int):
-        if exam_id in self.teacher_connections and websocket in self.teacher_connections[exam_id]:
+        if (
+            exam_id in self.teacher_connections
+            and websocket in self.teacher_connections[exam_id]
+        ):
             self.teacher_connections[exam_id].remove(websocket)
 
     async def connect_global_teacher(self, websocket: WebSocket):
@@ -46,7 +47,10 @@ class ConnectionManager:
         self.student_connections[exam_id].append(websocket)
 
     def disconnect_student(self, websocket: WebSocket, exam_id: int):
-        if exam_id in self.student_connections and websocket in self.student_connections[exam_id]:
+        if (
+            exam_id in self.student_connections
+            and websocket in self.student_connections[exam_id]
+        ):
             self.student_connections[exam_id].remove(websocket)
 
     async def broadcast_to_teachers(self, exam_id: int, message: dict):
@@ -64,21 +68,44 @@ class ConnectionManager:
             except Exception as e:
                 logger.error(f"Error sending WS msg to global teacher: {e}")
 
+
 manager = ConnectionManager()
 
+
 @router.websocket("/exams/{exam_id}/teacher")
-async def websocket_teacher(websocket: WebSocket, exam_id: int):
-    # Note: In production, verify the teacher's JWT from headers or query params
+async def websocket_teacher(
+    websocket: WebSocket, exam_id: int, token: str = Query(default=None)
+):
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return
+
+    try:
+        from config import settings
+
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        role = payload.get("role", "")
+        if role not in ("teacher", "admin"):
+            await websocket.close(code=4003, reason="Insufficient permissions")
+            return
+    except JWTError:
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
     await manager.connect_teacher(websocket, exam_id)
     try:
         while True:
-            # Keep connection alive, listen for any commands from teacher
             data = await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect_teacher(websocket, exam_id)
 
+
 @router.websocket("/anti-cheat/global")
-async def websocket_global_teacher(websocket: WebSocket, token: str = Query(default=None)):
+async def websocket_global_teacher(
+    websocket: WebSocket, token: str = Query(default=None)
+):
     """
     Global anti-cheat monitoring for Teacher Dashboard.
     Authenticates via ?token=<JWT> query parameter.
@@ -91,7 +118,10 @@ async def websocket_global_teacher(websocket: WebSocket, token: str = Query(defa
 
     try:
         from config import settings
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         role = payload.get("role", "")
         if role not in ("teacher", "admin"):
             await websocket.close(code=4003, reason="Insufficient permissions")
@@ -108,20 +138,35 @@ async def websocket_global_teacher(websocket: WebSocket, token: str = Query(defa
     except WebSocketDisconnect:
         manager.disconnect_global_teacher(websocket)
 
+
 @router.websocket("/exams/{exam_id}/student")
-async def websocket_student(websocket: WebSocket, exam_id: int):
-    # Note: Validate student JWT
+async def websocket_student(
+    websocket: WebSocket, exam_id: int, token: str = Query(default=None)
+):
+    if not token:
+        await websocket.close(code=4001, reason="Missing token")
+        return
+
+    try:
+        from config import settings
+
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        role = payload.get("role", "")
+        if role != "student":
+            await websocket.close(code=4003, reason="Insufficient permissions")
+            return
+    except JWTError:
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
     await manager.connect_student(websocket, exam_id)
     try:
         while True:
             data = await websocket.receive_json()
-            # If student sends an anti-cheat event (e.g. blur, hidden)
             event_type = data.get("type")
             if event_type in ["blur", "focus", "submit", "join"]:
-                # Broadcast this event to the teacher
                 await manager.broadcast_to_teachers(exam_id, data)
     except WebSocketDisconnect:
         manager.disconnect_student(websocket, exam_id)
-        # Notify teacher that student disconnected
-        # await manager.broadcast_to_teachers(exam_id, {"type": "disconnect", "student_id": ...})
-

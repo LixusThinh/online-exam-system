@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import { createExam, getClasses } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -31,27 +33,24 @@ const formSchema = z.object({
 
 export default function CreateExamPage() {
   const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
+  const { isAuthenticated, loading: isLoading, user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find(row => row.startsWith("token="));
-    if (tokenCookie) {
-      const t = tokenCookie.split("=")[1];
-      setToken(t);
-      getClasses(t).then(data => {
-        if (Array.isArray(data)) setClasses(data);
-      }).catch(console.error);
-    } else {
+    if (isLoading) return;
+    if (!isAuthenticated || (user?.role !== "teacher" && user?.role !== "admin")) {
       router.push("/login");
+      return;
     }
-  }, [router]);
+    getClasses().then(data => {
+      if (Array.isArray(data)) setClasses(data);
+    }).catch(console.error);
+  }, [isAuthenticated, isLoading, user, router]);
 
   const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema) as any, // <--- ĐẬP CÁI "as any" VÀO ĐÂY ĐỂ NÓ CÂM MÕM!
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       title: "",
       time_limit: 45,
@@ -60,7 +59,6 @@ export default function CreateExamPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!token) return;
     setError("");
     setLoading(true);
     try {
@@ -70,7 +68,7 @@ export default function CreateExamPage() {
         class_id: values.class_id ? parseInt(values.class_id) : null,
       };
 
-      const newExam = await createExam(payload, token);
+      const newExam = await createExam(payload);
       router.push(`/teacher/exams/${newExam.id}/questions`);
     } catch (err: any) {
       setError(err.message || "Tạo đề thi thất bại");
@@ -98,146 +96,72 @@ export default function CreateExamPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold">Tên đề thi *</FormLabel>
+                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">Tên đề thi <span className="text-orange-500">*</span></FormLabel>
                     <FormControl>
-                      <Input placeholder="Ví dụ: Kiểm tra 15 phút Toán Hình" className="h-12" {...field} />
+                      <Input
+                        placeholder="Ví dụ: Kiểm tra 15 phút Toán Hình"
+                        className="h-12 border-teal-100 focus-visible:ring-teal-500 bg-teal-50/30 dark:bg-teal-950/20 dark:border-teal-900/50 transition-colors"
+                        {...field}
+                      />
                     </FormControl>
-                    <FormDescription>
-                      Nhập tên hoặc mô tả ngắn gọn cho đề thi.
+                    <FormDescription className="text-slate-500">
+                      Nên đặt tên ngắn gọn, rõ ràng theo môn học hoặc theo lớp.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-red-500" />
                   </FormItem>
                 )}
               />
+
               <FormField
                 control={form.control}
                 name="time_limit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold">Thời gian làm bài (Phút) *</FormLabel>
+                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">Thời lượng (Phút) <span className="text-orange-500">*</span></FormLabel>
                     <FormControl>
-                      <Input type="number" className="h-12" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Thời gian tính bằng phút đếm ngược cho thí sinh.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="class_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold">Giao cho Lớp học (Tùy chọn)</FormLabel>
-                    <FormControl>
-                      <select 
-                        className="flex h-12 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      <Input
+                        type="number"
+                        min={1}
+                        className="h-12 border-teal-100 focus-visible:ring-teal-500 bg-teal-50/30 dark:bg-teal-950/20 dark:border-teal-900/50 transition-colors font-mono text-lg"
                         {...field}
-                      >
-                        <option value="">-- Tất cả học sinh (Công khai) --</option>
-                        {classes.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
+                      />
                     </FormControl>
-                    <FormDescription>
-                      Nếu chọn lớp, chỉ học sinh lớp này mới thấy đề thi.
+                    <FormDescription className="text-slate-500">
+                      Hệ thống sẽ tự động thu bài khi hết số phút này tính từ lúc sinh viên bắt đầu.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-red-500" />
                   </FormItem>
                 )}
               />
-              <div className="flex justify-end gap-4">
+
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-teal-50 dark:border-zinc-800 mt-8">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => router.push("/teacher/dashboard")}
-                  className="h-12 px-6"
+                  className="h-11 px-6 rounded-full border-teal-200 text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-900/30"
                 >
-                  Hủy
+                  Hủy bỏ
                 </Button>
-                <Button type="submit" className="h-12 px-8" disabled={loading}>
-                  {loading ? "Đang xử lý..." : "Lưu & Tiếp tục"}
+                <Button
+                  type="submit"
+                  className="h-11 px-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:-translate-y-0.5 transition-all font-semibold"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Đang khởi tạo...
+                    </>
+                  ) : (
+                    "Tiếp tục Soạn câu hỏi"
+                  )}
                 </Button>
               </div>
-            )}
-
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">Tên đề thi <span className="text-orange-500">*</span></FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Ví dụ: Kiểm tra 15 phút Toán Hình"
-                          className="h-12 border-teal-100 focus-visible:ring-teal-500 bg-teal-50/30 dark:bg-teal-950/20 dark:border-teal-900/50 transition-colors"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-slate-500">
-                        Nên đặt tên ngắn gọn, rõ ràng theo môn học hoặc theo lớp.
-                      </FormDescription>
-                      <FormMessage className="text-red-500" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="time_limit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">Thời lượng (Phút) <span className="text-orange-500">*</span></FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min={1}
-                          className="h-12 border-teal-100 focus-visible:ring-teal-500 bg-teal-50/30 dark:bg-teal-950/20 dark:border-teal-900/50 transition-colors font-mono text-lg"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-slate-500">
-                        Hệ thống sẽ tự động thu bài khi hết số phút này tính từ lúc sinh viên bắt đầu.
-                      </FormDescription>
-                      <FormMessage className="text-red-500" />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-teal-50 dark:border-zinc-800 mt-8">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => router.push("/teacher/dashboard")}
-                    className="h-11 px-6 rounded-full border-teal-200 text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-900/30"
-                  >
-                    Hủy bỏ
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="h-11 px-8 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:-translate-y-0.5 transition-all font-semibold"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Đang khởi tạo...
-                      </>
-                    ) : (
-                      "Tiếp tục Soạn câu hỏi"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </main>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -42,9 +42,11 @@ import {
   deleteClass,
   deleteExam
 } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const { isAuthenticated, loading: isLoading, logout } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
@@ -56,14 +58,14 @@ export default function AdminDashboard() {
     setLogs(prev => [`[${time}] ${msg}`, ...prev].slice(0, 50));
   };
 
-  const fetchData = useCallback(async (token: string) => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       addLog("Initializing system diagnostic...");
       const [u, c, e] = await Promise.all([
-        getUsers(token),
-        getClasses(token),
-        getExams(token)
+        getUsers(),
+        getClasses(),
+        getExams()
       ]);
       setUsers(Array.isArray(u) ? u : []);
       setClasses(Array.isArray(c) ? c : []);
@@ -77,29 +79,22 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (tokenCookie) {
-      const t = tokenCookie.split("=")[1];
-      fetchData(t);
-    } else {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       router.push("/login");
+      return;
     }
-  }, [fetchData, router]);
+    fetchData();
+  }, [isAuthenticated, isLoading, fetchData, router]);
 
   const handleDeleteUser = async (id: number, name: string) => {
     if (!window.confirm(`XÁC NHẬN TRUY CẬP: Xóa người dùng ${name}? Hành động này không thể hoàn tác!`)) return;
 
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) return;
-    const t = tokenCookie.split("=")[1];
-
     try {
       addLog(`Initiating user termination protocol: ID ${id}...`);
-      await deleteUser(id, t);
+      await deleteUser(id);
       addLog(`User ${name} wiped from database.`);
-      fetchData(t);
+      fetchData();
     } catch (err: any) {
       addLog(`TERMINATION FAILED: ${err.message}`);
     }
@@ -108,23 +103,18 @@ export default function AdminDashboard() {
   const handleDeleteClass = async (id: number, name: string) => {
     if (!window.confirm(`XÁC NHẬN TRUY CẬP: Xóa lớp học ${name}?`)) return;
 
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) return;
-    const t = tokenCookie.split("=")[1];
-
     try {
       addLog(`Commencing class dissolution: ${name}...`);
-      await deleteClass(id, t);
+      await deleteClass(id);
       addLog(`Class ${name} metadata purged.`);
-      fetchData(t);
+      fetchData();
     } catch (err: any) {
       addLog(`DISSOLUTION FAILED: ${err.message}`);
     }
   };
 
-  const logout = () => {
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+  const handleLogout = async () => {
+    await logout();
     router.push("/login");
   };
 
@@ -153,7 +143,7 @@ export default function AdminDashboard() {
               variant="outline"
               size="sm"
               className="border-[#00ff9f]/30 hover:bg-[#00ff9f] hover:text-black transition-all text-[10px] font-black tracking-widest h-8"
-              onClick={logout}
+              onClick={handleLogout}
             >
               <LogOut className="h-3 w-3 mr-2" />
               TERMINATE_SESSION
@@ -202,7 +192,7 @@ export default function AdminDashboard() {
                     <Users className="h-4 w-4" /> USER_DATABASE
                   </CardTitle>
                 </div>
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-[#00ff9f]/40 hover:text-[#00ff9f]" onClick={() => fetchData(document.cookie.split("token=")[1].split(";")[0])}>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-[#00ff9f]/40 hover:text-[#00ff9f]" onClick={() => fetchData()}>
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </Button>
               </CardHeader>

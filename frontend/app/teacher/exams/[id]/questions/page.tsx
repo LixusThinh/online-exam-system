@@ -9,14 +9,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trash2, AlertCircle, PlusCircle, Layers, ArrowLeft, CheckCircle2, Bookmark, FileText } from "lucide-react";
 import { createQuestions, getQuestionsForTeacher, deleteQuestion, getExam } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 type ChoiceType = { content: string; is_correct: boolean };
 
 export default function QuestionsManagementPage() {
   const params = useParams();
   const router = useRouter();
+  const { isAuthenticated, loading: isLoading } = useAuth();
   const examId = params.id as string;
-  const [token, setToken] = useState<string | null>(null);
 
   // Form State
   const [content, setContent] = useState("");
@@ -31,18 +32,18 @@ export default function QuestionsManagementPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchQuestions = useCallback(async (t: string) => {
+  const fetchQuestions = useCallback(async () => {
     try {
-      const data = await getQuestionsForTeacher(examId, t);
+      const data = await getQuestionsForTeacher(examId);
       setQuestions(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError("Không thể tải danh sách câu hỏi.");
     }
   }, [examId]);
 
-  const fetchExam = useCallback(async (t: string) => {
+  const fetchExam = useCallback(async () => {
     try {
-      const data = await getExam(examId, t);
+      const data = await getExam(examId);
       setExam(data);
     } catch (err) {
       console.log(err);
@@ -50,17 +51,14 @@ export default function QuestionsManagementPage() {
   }, [examId]);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (tokenCookie) {
-      const t = tokenCookie.split("=")[1];
-      setToken(t);
-      fetchExam(t);
-      fetchQuestions(t);
-    } else {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       router.push("/login");
+      return;
     }
-  }, [fetchQuestions, fetchExam, router]);
+    fetchExam();
+    fetchQuestions();
+  }, [isAuthenticated, isLoading, fetchExam, fetchQuestions, router]);
 
   const handleChoiceChange = (index: number, val: string) => {
     const newChoices = [...choices];
@@ -70,7 +68,6 @@ export default function QuestionsManagementPage() {
 
   const handleAddQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
     setError("");
     setLoading(true);
 
@@ -92,14 +89,14 @@ export default function QuestionsManagementPage() {
         },
       ];
 
-      await createQuestions(examId, payload, token);
+      await createQuestions(examId, payload);
       
       setContent("");
       setChoices(["", "", "", ""]);
       setCorrectIndex(0);
       setPoints(1);
       
-      await fetchQuestions(token);
+      await fetchQuestions();
 
     } catch (err: any) {
       setError(err.message || "Thêm câu hỏi thất bại");
@@ -109,13 +106,10 @@ export default function QuestionsManagementPage() {
   };
 
   const handleSaveQuestions = async () => {
-    if (!token) return;
     setIsSaving(true);
     try {
-      // Data đã được save từng câu mỗi khi Add (để sinh ra DB ID phục vụ cho việc Delete)
-      // Call createQuestions với mảng rỗng để không bị trùng lặp dữ liệu nhưng vẫn đảm bảo flow
       const questionsData: any[] = [];
-      await createQuestions(examId, questionsData, token);
+      await createQuestions(examId, questionsData);
       router.push('/teacher/dashboard');
     } catch (err: any) {
       alert("Quá trình lưu thất bại: " + err.message);
@@ -125,12 +119,11 @@ export default function QuestionsManagementPage() {
   };
 
   const handleDelete = async (questionId: number) => {
-    if (!token) return;
     if (!window.confirm("Bạn có chắc chắn muốn xóa câu hỏi này không?")) return;
 
     try {
-      await deleteQuestion(questionId, token);
-      await fetchQuestions(token);
+      await deleteQuestion(questionId);
+      await fetchQuestions();
     } catch (err: any) {
       alert("Xóa thất bại: " + err.message);
     }

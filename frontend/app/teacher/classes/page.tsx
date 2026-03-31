@@ -9,37 +9,42 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Users, PlusCircle, Copy, CheckCircle2 } from "lucide-react";
 import { getClasses, createClass } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function TeacherClassesPage() {
   const router = useRouter();
+  const { isAuthenticated, loading: isLoading, user } = useAuth();
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newClassName, setNewClassName] = useState("");
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  const getToken = () => {
-    const c = document.cookie.split("; ").find((r) => r.startsWith("token="));
-    return c ? c.split("=")[1] : null;
-  };
-
   const fetchClasses = async () => {
-    const token = getToken();
-    if (!token) { router.push("/login"); return; }
-    const data = await getClasses(token);
-    setClasses(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      const data = await getClasses();
+      setClasses(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchClasses(); }, []);
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated || (user?.role !== "teacher" && user?.role !== "admin")) {
+      router.push("/login");
+      return;
+    }
+    fetchClasses();
+  }, [isAuthenticated, isLoading, user, router]);
 
   const handleCreate = async () => {
     if (!newClassName.trim()) return;
-    const token = getToken();
-    if (!token) return;
     setCreating(true);
     try {
-      await createClass({ name: newClassName.trim() }, token);
+      await createClass({ name: newClassName.trim() });
       setNewClassName("");
       fetchClasses();
     } catch (err: any) {

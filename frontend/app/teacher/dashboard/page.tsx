@@ -32,9 +32,11 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { getExams, deleteExam, getClasses, createClass } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function TeacherDashboard() {
   const router = useRouter();
+  const { logout, user, loading: authLoading } = useAuth();
   const [exams, setExams] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,12 +45,12 @@ export default function TeacherDashboard() {
   const [error, setError] = useState("");
   const [liveEvents, setLiveEvents] = useState<{ id: number, message: string, type: string }[]>([]);
 
-  const fetchData = useCallback(async (token: string) => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [examsData, classesData] = await Promise.all([
-        getExams(token),
-        getClasses(token)
+        getExams(),
+        getClasses()
       ]);
       setExams(Array.isArray(examsData) ? examsData : []);
       setClasses(Array.isArray(classesData) ? classesData : []);
@@ -60,26 +62,23 @@ export default function TeacherDashboard() {
   }, []);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (tokenCookie) {
-      const t = tokenCookie.split("=")[1];
-      fetchData(t);
-    } else {
-      router.push("/login");
+    if (!authLoading) {
+      if (!user) {
+        router.push("/login");
+      } else if (user.role !== "teacher" && user.role !== "admin") {
+        router.push("/login");
+      } else {
+        fetchData();
+      }
     }
-  }, [fetchData, router]);
+  }, [user, authLoading, fetchData, router]);
 
   // LIVE MONITORING WEBSOCKET (Anti-Cheat integration)
   useEffect(() => {
-    // Lấy token từ cookie để xác thực WebSocket
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) return;
-    const token = tokenCookie.split("=")[1];
+    if (typeof window === "undefined") return;
+    if (!isAuthenticated || !user) return;
 
-    // Kết nối tới endpoint global monitoring với token xác thực
-    const wsUrl = `ws://localhost:8000/ws/anti-cheat/global?token=${token}`;
+    const wsUrl = `ws://localhost:8000/ws/anti-cheat/global`;
     const ws = new WebSocket(wsUrl);
 
     ws.onmessage = (event) => {
@@ -92,7 +91,6 @@ export default function TeacherDashboard() {
           type: data.type || "info"
         }, ...prev].slice(0, 5));
       } catch (e) {
-        // Fallback cho text thô
         if (event.data.includes("Cheat")) {
           setLiveEvents(prev => [{
             id: Date.now(),
@@ -113,16 +111,11 @@ export default function TeacherDashboard() {
   const handleCreateClass = async () => {
     if (!newClassName.trim()) return;
 
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) return;
-    const t = tokenCookie.split("=")[1];
-
     try {
       setIsCreatingClass(true);
-      await createClass({ name: newClassName.trim() }, t);
+      await createClass({ name: newClassName.trim() });
       setNewClassName("");
-      fetchData(t);
+      fetchData();
     } catch (err: any) {
       alert("Tạo lớp thất bại: " + err.message);
     } finally {
@@ -131,24 +124,14 @@ export default function TeacherDashboard() {
   };
 
   const handleDeleteExam = async (id: number) => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) return;
-    const t = tokenCookie.split("=")[1];
-
     if (window.confirm("Bạn có chắc chắn muốn xóa đề thi này không? Toàn bộ câu hỏi và kết quả cũng sẽ bị xóa vĩnh viễn!")) {
       try {
-        await deleteExam(id, t);
-        fetchData(t); // Refresh list
+        await deleteExam(id);
+        fetchData();
       } catch (err: any) {
         alert("Xóa thất bại: " + err.message);
       }
     }
-  };
-
-  const logout = () => {
-    document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-    router.push("/login");
   };
 
   return (
@@ -171,7 +154,7 @@ export default function TeacherDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-rose-600 transition-colors" onClick={logout}>
+            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-rose-600 transition-colors" onClick={() => logout()}>
               <LogOut className="h-4 w-4 mr-2" />
               Đăng xuất
             </Button>

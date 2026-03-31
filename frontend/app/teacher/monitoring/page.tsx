@@ -8,19 +8,22 @@ import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, Activity, AlertTriangle, Eye, Shield, Wifi, WifiOff
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function TeacherMonitoringPage() {
   const router = useRouter();
+  const { isAuthenticated, loading: isLoading, user } = useAuth();
   const [connected, setConnected] = useState(false);
   const [events, setEvents] = useState<{ id: number; message: string; type: string; time: string }[]>([]);
 
   useEffect(() => {
-    const cookies = document.cookie.split("; ");
-    const tokenCookie = cookies.find((row) => row.startsWith("token="));
-    if (!tokenCookie) { router.push("/login"); return; }
-    const token = tokenCookie.split("=")[1];
+    if (isLoading) return;
+    if (!isAuthenticated || (user?.role !== "teacher" && user?.role !== "admin")) {
+      router.push("/login");
+      return;
+    }
 
-    const ws = new WebSocket(`ws://localhost:8000/ws/anti-cheat/global?token=${token}`);
+    const ws = new WebSocket(`ws://localhost:8000/ws/anti-cheat/global`);
 
     ws.onopen = () => setConnected(true);
     ws.onclose = () => setConnected(false);
@@ -46,7 +49,7 @@ export default function TeacherMonitoringPage() {
     };
 
     return () => ws.close();
-  }, [router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans">

@@ -12,29 +12,27 @@ import {
   ArrowLeft, Clock, Search
 } from "lucide-react";
 import { getExams, deleteExam } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function TeacherExamsPage() {
   const router = useRouter();
+  const { isAuthenticated, loading: isLoading, user } = useAuth();
   const [exams, setExams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  const getToken = () => {
-    const c = document.cookie.split("; ").find((r) => r.startsWith("token="));
-    return c ? c.split("=")[1] : null;
-  };
-
   useEffect(() => {
-    const token = getToken();
-    if (!token) { router.push("/login"); return; }
-    getExams(token).then((d) => setExams(Array.isArray(d) ? d : [])).finally(() => setLoading(false));
-  }, [router]);
+    if (isLoading) return;
+    if (!isAuthenticated || (user?.role !== "teacher" && user?.role !== "admin")) {
+      router.push("/login");
+      return;
+    }
+    getExams().then((d) => setExams(Array.isArray(d) ? d : [])).finally(() => setLoading(false));
+  }, [isAuthenticated, isLoading, user, router]);
 
   const handleDelete = async (id: number) => {
-    const token = getToken();
-    if (!token) return;
     if (window.confirm("Xóa đề thi này? Toàn bộ câu hỏi và kết quả sẽ bị xóa vĩnh viễn!")) {
-      await deleteExam(id, token);
+      await deleteExam(id);
       setExams((prev) => prev.filter((e) => e.id !== id));
     }
   };

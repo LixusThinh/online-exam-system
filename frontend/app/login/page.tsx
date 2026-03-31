@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { loginApi } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Eye,
   EyeOff,
@@ -16,6 +16,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
+  const { login, user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,31 +28,25 @@ export default function LoginPage() {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (user && !authLoading) {
+      if (user.role === "admin") {
+        router.push("/admin/dashboard");
+      } else if (user.role === "teacher") {
+        router.push("/teacher/dashboard");
+      } else if (user.role === "student") {
+        router.push("/student/dashboard");
+      }
+    }
+  }, [user, authLoading, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const response = await loginApi({ username, password });
-
-      if (response.access_token) {
-        document.cookie = `token=${response.access_token}; path=/; max-age=86400`;
-      }
-
-      const role = response.user?.role;
-
-      if (role === "admin") {
-        router.push("/admin/dashboard");
-      } else if (role === "teacher") {
-        router.push("/teacher/dashboard");
-      } else if (role === "student") {
-        router.push("/student/dashboard");
-      } else {
-        throw new Error(
-          "Không xác định được quyền truy cập. Vui lòng liên hệ quản trị viên."
-        );
-      }
+      await login(username, password);
     } catch (err: any) {
       setError(err.message || "Đã xảy ra lỗi khi đăng nhập.");
     } finally {
