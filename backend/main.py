@@ -10,6 +10,7 @@ from fastapi import (
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from datetime import timedelta, datetime, timezone
@@ -18,6 +19,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import uuid
+import logging
 
 import models
 from models import UserRole
@@ -25,7 +27,13 @@ import schemas
 import auth
 from database import get_db
 from dependencies import (
+    ACCESS_TOKEN_NAME,
+    REFRESH_TOKEN_NAME,
+    CSRF_TOKEN_NAME,
     get_current_user,
+    get_auth_cookie_settings,
+    get_token_from_cookie,
+    get_token_from_header,
     require_permissions,
     create_auth_cookies,
     clear_auth_cookies,
@@ -36,6 +44,7 @@ from redis_mgr import redis_mgr
 from security import generate_csrf_token
 
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger("sky_exam.security")
 app = FastAPI(
     title="SKY-EXAM API",
     description="Hệ thống quản lý thi trực tuyến thế hệ mới - SKY-EXAM",
@@ -273,35 +282,30 @@ def refresh_token(
 def logout(
     request: Request,
     response: Response,
-    token_data: schemas.TokenRefreshRequest = None,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user),
-    _csrf: None = Depends(require_csrf),
 ):
-    if hasattr(request.state, "token_jti") and request.state.token_jti:
-        expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        redis_mgr.blacklist_access_token(request.state.token_jti, expires_delta)
-
-    if token_data and token_data.refresh_token:
-        redis_mgr.blacklist_refresh_token(
-            token_data.refresh_token, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        )
-        db_token = (
-            db.query(models.RefreshToken)
-            .filter(
-                models.RefreshToken.token == token_data.refresh_token,
-                models.RefreshToken.user_id == current_user.id,
-                models.RefreshToken.revoked == False,
+    access_token = get_token_from_header(request) or get_token_from_cookie(request)
+    if access_token:
+        try:
+            payload = jwt.decode(
+                access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
             )
-            .first()
-        )
-        if db_token:
-            db_token.revoked = True  # type: ignore[assignment]
-            db.commit()
+            token_jti = payload.get("jti")
+            if token_jti:
+                expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+                redis_mgr.blacklist_access_token(str(token_jti), expires_delta)
+        except JWTError:
+            pass
 
-    cookies = clear_auth_cookies()
-    for cookie_name, cookie_params in cookies.items():
-        response.delete_cookie(**cookie_params)
+    refresh_token = request.cookies.get(REFRESH_TOKEN_NAME)
+
+    if refresh_token:
+        redis_mgr.blacklist_refresh_token(
+            refresh_token, timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+    cookie_settings = get_auth_cookie_settings()
+    response.delete_cookie(key=ACCESS_TOKEN_NAME, httponly=True, **cookie_settings)
+    response.delete_cookie(key=REFRESH_TOKEN_NAME, httponly=True, **cookie_settings)
+    response.delete_cookie(key=CSRF_TOKEN_NAME, httponly=False, **cookie_settings)
 
     return {"message": "Successfully logged out"}
 
@@ -330,6 +334,31 @@ def logout_all_devices(
         response.delete_cookie(**cookie_params)
 
     return {"message": "Successfully logged out from all devices"}
+
+
+@app.post(
+    "/security/devtools-violation",
+    response_model=schemas.SecurityViolationResponse,
+)
+@limiter.limit("20/minute")
+def log_security_violation(
+    request: Request,
+    payload: schemas.SecurityViolationCreate,
+    current_user: models.User = Depends(get_current_user),
+):
+    detected_at = payload.detected_at or datetime.now(timezone.utc)
+    logger.warning(
+        "Security violation detected | user_id=%s username=%s role=%s exam_id=%s type=%s detected_at=%s metadata=%s ip=%s",
+        current_user.id,
+        current_user.username,
+        current_user.role,
+        payload.exam_id,
+        payload.violation_type,
+        detected_at.isoformat(),
+        payload.metadata,
+        get_remote_address(request),
+    )
+    return {"message": "Security violation logged"}
 
 
 # -----------------

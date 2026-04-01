@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, Field
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 import re
 
@@ -193,3 +193,14 @@ class SubmissionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SecurityViolationCreate(BaseModel):
+    exam_id: Optional[int] = None
+    violation_type: str
+    detected_at: Optional[datetime] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class SecurityViolationResponse(BaseModel):
+    message: str

@@ -33,15 +33,17 @@ import {
 } from "lucide-react";
 import { getExams, deleteExam, getClasses, createClass } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { getAccessToken } from "@/lib/auth";
 
 export default function TeacherDashboard() {
   const router = useRouter();
-  const { logout, user, loading: authLoading } = useAuth();
+  const { logout, user, loading: authLoading, isAuthenticated } = useAuth();
   const [exams, setExams] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newClassName, setNewClassName] = useState("");
   const [isCreatingClass, setIsCreatingClass] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [liveEvents, setLiveEvents] = useState<{ id: number, message: string, type: string }[]>([]);
 
@@ -62,6 +64,8 @@ export default function TeacherDashboard() {
   }, []);
 
   useEffect(() => {
+    if (isLoggingOut) return;
+
     if (!authLoading) {
       if (!user) {
         router.push("/login");
@@ -71,42 +75,86 @@ export default function TeacherDashboard() {
         fetchData();
       }
     }
-  }, [user, authLoading, fetchData, router]);
+  }, [user, authLoading, fetchData, isLoggingOut, router]);
 
   // LIVE MONITORING WEBSOCKET (Anti-Cheat integration)
+  // Auth strategy: try to pass token as query param (if cookie is readable).
+  // If HttpOnly prevents JS from reading it, connect without param — the backend
+  // will extract the token from the cookie header in the WS upgrade handshake.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isLoggingOut) return;
     if (!isAuthenticated || !user) return;
 
-    const wsUrl = `ws://localhost:8000/ws/anti-cheat/global`;
-    const ws = new WebSocket(wsUrl);
+    let ws: WebSocket | null = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
+    let retryTimeout: NodeJS.Timeout | null = null;
+    let isCancelled = false;
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        const msg = data.message || "Phát hiện hoạt động mới!";
-        setLiveEvents(prev => [{
-          id: Date.now(),
-          message: msg,
-          type: data.type || "info"
-        }, ...prev].slice(0, 5));
-      } catch (e) {
-        if (event.data.includes("Cheat")) {
+    const connect = () => {
+      if (isCancelled) return;
+
+      // Try reading the access_token from cookie (may be null if HttpOnly)
+      const token = getAccessToken();
+      // Build WS URL — append token as query param if available, otherwise
+      // the backend will read it from the cookie header automatically
+      const baseWsUrl = `ws://localhost:8000/ws/anti-cheat/global`;
+      const wsUrl = token
+        ? `${baseWsUrl}?token=${encodeURIComponent(token)}`
+        : baseWsUrl;
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("[WS] Global anti-cheat monitoring connected");
+        retryCount = 0; // Reset retry count on successful connection
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const msg = data.message || "Phát hiện hoạt động mới!";
           setLiveEvents(prev => [{
             id: Date.now(),
-            message: "⚠️ " + event.data,
-            type: "warning"
+            message: msg,
+            type: data.type || "info"
           }, ...prev].slice(0, 5));
+        } catch (e) {
+          if (event.data.includes("Cheat")) {
+            setLiveEvents(prev => [{
+              id: Date.now(),
+              message: "⚠️ " + event.data,
+              type: "warning"
+            }, ...prev].slice(0, 5));
+          }
         }
-      }
+      };
+
+      ws.onerror = () => {
+        console.warn("[WS] Global monitoring connection error");
+      };
+
+      ws.onclose = (event) => {
+        console.log(`[WS] Global monitoring disconnected (code: ${event.code})`);
+        // Reconnect on unexpected close (not manual close & not auth failure)
+        if (!isCancelled && event.code !== 1000 && event.code !== 4001 && event.code !== 4003 && retryCount < MAX_RETRIES) {
+          retryCount++;
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          console.log(`[WS] Reconnecting in ${delay}ms (attempt ${retryCount}/${MAX_RETRIES})`);
+          retryTimeout = setTimeout(connect, delay);
+        }
+      };
     };
 
-    ws.onerror = () => {
-      console.warn("[WS] Global monitoring connection failed");
-    };
+    connect();
 
-    return () => ws.close();
-  }, []);
+    // Cleanup: close WS and cancel any pending retry on unmount or dep change
+    return () => {
+      isCancelled = true;
+      if (retryTimeout) clearTimeout(retryTimeout);
+      if (ws) ws.close(1000, "Component unmounted");
+    };
+  }, [isAuthenticated, isLoggingOut, user]);
 
   const handleCreateClass = async () => {
     if (!newClassName.trim()) return;
@@ -134,6 +182,30 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+
+    try {
+      const res = await fetch("http://localhost:8000/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        console.error("[Logout] Backend returned:", res.status);
+      }
+
+      await logout();
+
+      console.log("[Logout] Success - redirecting to login");
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("[Logout] Error:", error);
+      window.location.href = "/login";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 font-sans">
 
@@ -154,7 +226,7 @@ export default function TeacherDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-rose-600 transition-colors" onClick={() => logout()}>
+            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-rose-600 transition-colors" onClick={handleLogout} disabled={isLoggingOut}>
               <LogOut className="h-4 w-4 mr-2" />
               Đăng xuất
             </Button>

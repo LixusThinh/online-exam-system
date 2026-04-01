@@ -25,11 +25,93 @@ import {
 import { getExams, getMySubmissions, joinClass, getClasses } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 
+interface ExamQuestion {
+  points?: number | null;
+}
+
+interface ExamItem {
+  id: number;
+  title?: string;
+  questions?: ExamQuestion[];
+}
+
+interface SubmissionItem {
+  id: number;
+  quiz_id?: number;
+  exam_id?: number;
+  score?: number | null;
+  finished_at?: string | null;
+  started_at?: string | null;
+  submitted_at?: string | null;
+}
+
+const RECENT_RESULTS_DATE_FORMATTER = new Intl.DateTimeFormat("vi-VN", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function parseApiDate(value?: string | null): Date | null {
+  if (!value) return null;
+
+  const parsedDate = new Date(value);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return parsedDate;
+  }
+
+  const normalizedValue = value.includes(" ") ? value.replace(" ", "T") : value;
+  const fallbackDate = new Date(normalizedValue);
+  if (!Number.isNaN(fallbackDate.getTime())) {
+    return fallbackDate;
+  }
+
+  return null;
+}
+
+function formatSubmissionDate(submission: SubmissionItem): string {
+  const rawDate =
+    submission.finished_at ?? submission.submitted_at ?? submission.started_at;
+  const parsedDate = parseApiDate(rawDate);
+
+  return parsedDate ? RECENT_RESULTS_DATE_FORMATTER.format(parsedDate) : "Chưa có ngày";
+}
+
+function getSubmissionExamId(submission: SubmissionItem): number | null {
+  return submission.quiz_id ?? submission.exam_id ?? null;
+}
+
+function getExamTotalPoints(exam?: ExamItem): number | null {
+  if (!exam?.questions?.length) return null;
+
+  const totalPoints = exam.questions.reduce(
+    (sum, question) => sum + (Number(question.points) || 0),
+    0
+  );
+
+  return totalPoints > 0 ? totalPoints : null;
+}
+
+function getDisplayScore(submission: SubmissionItem, exam?: ExamItem): number {
+  const rawScore = Number(submission.score);
+  if (!Number.isFinite(rawScore) || rawScore < 0) {
+    return 0;
+  }
+
+  const totalPoints = getExamTotalPoints(exam);
+  if (!totalPoints) {
+    return Number(rawScore.toFixed(1));
+  }
+
+  return Number(Math.min((rawScore / totalPoints) * 10, 10).toFixed(1));
+}
+
 export default function StudentDashboard() {
   const router = useRouter();
   const { logout, user, loading: authLoading } = useAuth();
-  const [exams, setExams] = useState<any[]>([]);
-  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [exams, setExams] = useState<ExamItem[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionItem[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteCode, setInviteCode] = useState("");
@@ -93,12 +175,20 @@ export default function StudentDashboard() {
   };
 
   const pendingExams = exams.filter(
-    (e) => !submissions.some((s) => s.exam_id === e.id)
+    (exam) =>
+      !submissions.some(
+        (submission) => getSubmissionExamId(submission) === exam.id
+      )
   );
   const avgScore =
     submissions.length > 0
       ? (
-          submissions.reduce((acc, curr) => acc + curr.score, 0) /
+          submissions.reduce((acc, curr) => {
+            const relatedExam = exams.find(
+              (exam) => exam.id === getSubmissionExamId(curr)
+            );
+            return acc + getDisplayScore(curr, relatedExam);
+          }, 0) /
           submissions.length
         ).toFixed(1)
       : "0.0";
@@ -360,7 +450,7 @@ export default function StudentDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {exams.map((exam) => {
                   const isSubmitted = submissions.some(
-                    (s) => s.exam_id === exam.id
+                    (submission) => getSubmissionExamId(submission) === exam.id
                   );
                   return (
                     <div
@@ -521,37 +611,40 @@ export default function StudentDashboard() {
               ) : (
                 <>
                   <div className="divide-y divide-white/[0.04]">
-                    {submissions.slice(0, 8).map((sub) => (
+                    {submissions.slice(0, 8).map((submission) => {
+                      const examId = getSubmissionExamId(submission);
+                      const relatedExam = exams.find((exam) => exam.id === examId);
+                      const displayScore = getDisplayScore(submission, relatedExam);
+
+                      return (
                       <div
-                        key={sub.id}
+                        key={submission.id}
                         className="flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.02] transition-colors duration-150 group"
                       >
                         <div className="space-y-0.5 min-w-0 flex-1">
                           <p className="text-sm font-semibold text-white/60 truncate group-hover:text-white/80 transition-colors">
-                            Kỳ thi #{sub.exam_id}
+                            {relatedExam?.title || (examId ? `Kỳ thi #${examId}` : "Kỳ thi chưa xác định")}
                           </p>
                           <div className="flex items-center gap-1.5 text-[10px] text-white/20 font-medium">
                             <CalendarDays className="w-3 h-3" />
                             <span>
-                              {new Date(sub.submitted_at).toLocaleDateString(
-                                "vi-VN"
-                              )}
+                              {formatSubmissionDate(submission)}
                             </span>
                           </div>
                         </div>
                         <div
                           className={`text-xl font-black font-mono tabular-nums ${
-                            sub.score >= 8
+                            displayScore >= 8
                               ? "text-emerald-400"
-                              : sub.score >= 5
+                              : displayScore >= 5
                               ? "text-amber-400"
                               : "text-rose-400"
                           }`}
                         >
-                          {sub.score?.toFixed(1) || "0.0"}
+                          {displayScore.toFixed(1)}
                         </div>
                       </div>
-                    ))}
+                    )})}
                   </div>
                   {submissions.length > 0 && (
                     <div className="p-4 border-t border-white/[0.04] flex justify-center">

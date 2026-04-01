@@ -1,11 +1,25 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from typing import Dict, List
+from typing import Dict, List, Optional
 from jose import JWTError, jwt
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["WebSockets"])
+
+
+def _get_ws_token(websocket: WebSocket, token_param: Optional[str]) -> Optional[str]:
+    """
+    Extract JWT token for WebSocket authentication.
+    Priority: 1) query param ?token=xxx  2) access_token cookie (HttpOnly)
+    The browser automatically sends cookies during the WS upgrade handshake,
+    so HttpOnly cookies ARE accessible server-side even though JS can't read them.
+    """
+    if token_param:
+        return token_param
+    # Fallback: read from cookie header (supports HttpOnly cookies)
+    return websocket.cookies.get("access_token")
+
 
 
 class ConnectionManager:
@@ -76,7 +90,9 @@ manager = ConnectionManager()
 async def websocket_teacher(
     websocket: WebSocket, exam_id: int, token: str = Query(default=None)
 ):
-    if not token:
+    # Resolve token from query param or HttpOnly cookie
+    resolved_token = _get_ws_token(websocket, token)
+    if not resolved_token:
         await websocket.close(code=4001, reason="Missing token")
         return
 
@@ -84,7 +100,7 @@ async def websocket_teacher(
         from config import settings
 
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            resolved_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         role = payload.get("role", "")
         if role not in ("teacher", "admin"):
@@ -108,11 +124,12 @@ async def websocket_global_teacher(
 ):
     """
     Global anti-cheat monitoring for Teacher Dashboard.
-    Authenticates via ?token=<JWT> query parameter.
+    Authenticates via ?token=<JWT> query parameter OR HttpOnly access_token cookie.
     Receives broadcast events from ALL active exams.
     """
-    # Validate JWT token
-    if not token:
+    # Resolve token from query param or HttpOnly cookie
+    resolved_token = _get_ws_token(websocket, token)
+    if not resolved_token:
         await websocket.close(code=4001, reason="Missing token")
         return
 
@@ -120,7 +137,7 @@ async def websocket_global_teacher(
         from config import settings
 
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            resolved_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         role = payload.get("role", "")
         if role not in ("teacher", "admin"):
@@ -143,7 +160,9 @@ async def websocket_global_teacher(
 async def websocket_student(
     websocket: WebSocket, exam_id: int, token: str = Query(default=None)
 ):
-    if not token:
+    # Resolve token from query param or HttpOnly cookie
+    resolved_token = _get_ws_token(websocket, token)
+    if not resolved_token:
         await websocket.close(code=4001, reason="Missing token")
         return
 
@@ -151,7 +170,7 @@ async def websocket_student(
         from config import settings
 
         payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            resolved_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         role = payload.get("role", "")
         if role != "student":
@@ -170,3 +189,4 @@ async def websocket_student(
                 await manager.broadcast_to_teachers(exam_id, data)
     except WebSocketDisconnect:
         manager.disconnect_student(websocket, exam_id)
+

@@ -18,6 +18,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login", auto_error=False)
 csrf_header = APIKeyHeader(name="X-CSRF-Token", auto_error=False)
 
 
+def get_auth_cookie_settings() -> dict[str, str | bool]:
+    is_prod = settings.is_production
+    return {
+        "path": "/",
+        "secure": is_prod,
+        "samesite": "strict" if is_prod else "lax",
+    }
+
+
 def get_token_from_header(request: Request) -> str | None:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
@@ -164,52 +173,50 @@ def create_auth_cookies(
     access_expires: int,
     refresh_expires: int,
 ) -> dict:
+    # In dev (SQLite), use secure=False & samesite=lax so cookies work
+    # across localhost ports (3000→8000) and over non-HTTPS.
+    # In production (PostgreSQL), use secure=True & samesite=strict.
+    cookie_settings = get_auth_cookie_settings()
+
     return {
         ACCESS_TOKEN_NAME: {
             "value": access_token,
             "max_age": access_expires * 60,
             "httponly": True,
-            "secure": True,
-            "samesite": "strict",
+            **cookie_settings,
         },
         REFRESH_TOKEN_NAME: {
             "value": refresh_token,
             "max_age": refresh_expires * 24 * 3600,
             "httponly": True,
-            "secure": True,
-            "samesite": "strict",
+            **cookie_settings,
         },
         CSRF_TOKEN_NAME: {
             "value": csrf_token,
             "max_age": access_expires * 60,
             "httponly": False,
-            "secure": True,
-            "samesite": "strict",
+            **cookie_settings,
         },
     }
 
 
 def clear_auth_cookies() -> dict:
+    cookie_settings = get_auth_cookie_settings()
+
     return {
         ACCESS_TOKEN_NAME: {
-            "value": "",
-            "max_age": 0,
+            "key": ACCESS_TOKEN_NAME,
             "httponly": True,
-            "secure": True,
-            "samesite": "strict",
+            **cookie_settings,
         },
         REFRESH_TOKEN_NAME: {
-            "value": "",
-            "max_age": 0,
+            "key": REFRESH_TOKEN_NAME,
             "httponly": True,
-            "secure": True,
-            "samesite": "strict",
+            **cookie_settings,
         },
         CSRF_TOKEN_NAME: {
-            "value": "",
-            "max_age": 0,
+            "key": CSRF_TOKEN_NAME,
             "httponly": False,
-            "secure": True,
-            "samesite": "strict",
+            **cookie_settings,
         },
     }

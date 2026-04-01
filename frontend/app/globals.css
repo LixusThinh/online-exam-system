@@ -128,4 +128,10 @@
   html {
     @apply font-sans;
   }
+
+  .exam-guard-active,
+  .exam-guard-active body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }

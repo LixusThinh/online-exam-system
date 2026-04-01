@@ -112,14 +112,14 @@ export function useAuth(): UseAuthReturn {
 
     const logout = useCallback(async () => {
         clearRefreshTimer();
-        clearAuthCookies();
-        
+
         try {
             await logoutApi();
         } catch (err) {
             console.warn("Logout API call failed:", err);
         }
 
+        clearAuthCookies();
         setUser(null);
         router.push("/login");
     }, [clearRefreshTimer, router]);

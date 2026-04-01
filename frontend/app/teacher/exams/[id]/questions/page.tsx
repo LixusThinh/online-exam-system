@@ -340,7 +340,7 @@ export default function QuestionsManagementPage() {
             {isSaving ? "Đang lưu..." : "💾 Lưu & Hoàn tất đề thi"}
           </Button>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
